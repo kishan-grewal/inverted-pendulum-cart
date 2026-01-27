@@ -1,0 +1,79 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define BUTTON_MODE_PIN 23
+#define BUTTON_ACTION_PIN 22
+#define BUTTON_CALIBRATE_PIN 21
+
+#define ENCODER_CART_A 18
+#define ENCODER_CART_B 19
+#define ENCODER_PENDULUM_A 16
+#define ENCODER_PENDULUM_B 17
+
+#define ENCODER_MOTOR1_A 32
+#define ENCODER_MOTOR1_B 33
+#define ENCODER_MOTOR2_A 25
+#define ENCODER_MOTOR2_B 26
+#define ENCODER_MOTOR3_A 27
+#define ENCODER_MOTOR3_B 14
+#define ENCODER_MOTOR4_A 12
+#define ENCODER_MOTOR4_B 13
+
+#define MOTOR1_PWM_FWD 2
+#define MOTOR1_PWM_REV 4
+#define MOTOR2_PWM_FWD 5
+#define MOTOR2_PWM_REV 15
+#define MOTOR3_PWM_FWD 21
+#define MOTOR3_PWM_REV 22
+#define MOTOR4_PWM_FWD 23
+#define MOTOR4_PWM_REV 19
+
+#define CONTROL_FREQ_HZ 100
+#define CONTROL_PERIOD_MS (1000 / CONTROL_FREQ_HZ)
+
+#define MOTOR_PID_FREQ_HZ 500
+#define MOTOR_PID_PERIOD_MS (1000 / MOTOR_PID_FREQ_HZ)
+
+#define FORCE_MAX 15.0
+#define FORCE_MIN -15.0
+
+#define LQR_K0 1.0
+#define LQR_K1 3.0
+#define LQR_K2 40.0
+#define LQR_K3 8.0
+
+#define PID_KP 50.0
+#define PID_KI 0.0
+#define PID_KD 3.0
+#define PID_INTEGRAL_LIMIT 10.0
+
+#define POLE_P1 -2.0
+#define POLE_P2 -3.0
+#define POLE_P3 -4.0
+#define POLE_P4 -5.0
+
+#define MOTOR_PID_KP 2.0
+#define MOTOR_PID_KI 0.5
+#define MOTOR_PID_KD 0.05
+#define MOTOR_PID_INTEGRAL_LIMIT 50.0
+
+#define OBSERVER_POLE_1 -10.0
+#define OBSERVER_POLE_2 -12.0
+#define OBSERVER_POLE_3 -15.0
+#define OBSERVER_POLE_4 -18.0
+
+#define CART_MASS 0.828
+#define PEND_ROD_MASS 0.0225
+#define PEND_TIP_MASS 0.050
+#define PEND_LENGTH 0.6
+#define GRAVITY 9.81
+
+#define ENCODER_CPR_CART 2048
+#define ENCODER_CPR_PEND 2048
+#define ENCODER_CPR_MOTOR 48
+
+#define WHEEL_RADIUS 0.035
+
+#define SERIAL_BAUD 115200
+
+#endif
