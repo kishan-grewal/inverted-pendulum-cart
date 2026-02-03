@@ -1,12 +1,7 @@
 #include <Arduino.h>
 #include "drive.h"
 
-// put function declarations here:
-int myFunction(int, int);
-
 void setup() {
-  // put your setup code here, to run once:
-  // int result = myFunction(2, 3);
   motor_setup();
 }
 
@@ -23,9 +18,4 @@ void loop() {
 
   set_motor_speed(0);
   delay(1000);
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
 }

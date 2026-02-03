@@ -2,23 +2,33 @@
 #include <Wire.h>
 #include "drive.h"
 
-MotoronI2C motoron1(0x10); // I2C address 0x10
-
+MotoronI2C bottom_shield(16);
+MotoronI2C top_shield(17);
 
 void motor_setup() {
-    motoron1.setBus(&Wire);
-    Wire.begin();
-    motoron1.reinitialize();
-    motoron1.disableCrc();
+    Wire1.begin();
 
-    motoron1.clearResetFlag();
+    // Configure shields to use Wire1 (SCL1/SDA1)
+    bottom_shield.setBus(&Wire1);
+    //top_shield.setBus(&Wire1);
 
-    motoron1.setMaxAcceleration(1, 70);
-    motoron1.setMaxDeceleration(1, 150);
+    // Initialize shields
+    bottom_shield.reinitialize();
+    bottom_shield.clearResetFlag();
+    //top_shield.reinitialize();
+    //top_shield.clearResetFlag();
 
-    motoron1.clearMotorFaultUnconditional();
+    // Bottom shield max accels
+    bottom_shield.setMaxAcceleration(1, 140);
+    bottom_shield.setMaxDeceleration(1, 300);
+    //bottom_shield.setMaxAcceleration(2, 140);
+    //bottom_shield.setMaxDeceleration(2, 300);
 
-    motoron1.setSpeed(1, 0);
+    // Top shield max accels
+    //top_shield.setMaxAcceleration(1, 140);
+    //top_shield.setMaxDeceleration(1, 300);
+    //top_shield.setMaxAcceleration(2, 140);
+    //top_shield.setMaxDeceleration(2, 300);
 }
 
 void set_motor_speed(int16_t speed) {
@@ -28,10 +38,9 @@ void set_motor_speed(int16_t speed) {
 
     if (speed >= 0) {
         // Forward
-        motoron1.setSpeed(1, speed);
+        bottom_shield.setSpeed(1, speed);
     } else {
         // Reverse
-        motoron1.setSpeed(1, speed);
+        bottom_shield.setSpeed(1, speed);
     }
-
 }
