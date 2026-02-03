@@ -6,6 +6,7 @@ MotoronI2C motoron1(0x10); // I2C address 0x10
 
 
 void motor_setup() {
+    motoron1.setBus(&Wire);
     Wire.begin();
     motoron1.reinitialize();
     motoron1.disableCrc();
