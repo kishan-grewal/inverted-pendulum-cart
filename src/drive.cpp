@@ -1,10 +1,23 @@
 #include <Motoron.h>
+#include <Wire.h>
+#include "drive.h"
 
-Motoron motoron1(0x20);
+MotoronI2C motoron1(0x10); // I2C address 0x10
+
 
 void motor_setup() {
-    motoron1.begin();
-    motoron1.setSpeed(0);
+    Wire.begin();
+    motoron1.reinitialize();
+    motoron1.disableCrc();
+
+    motoron1.clearResetFlag();
+
+    motoron1.setMaxAcceleration(1, 70);
+    motoron1.setMaxDeceleration(1, 150);
+
+    motoron1.clearMotorFaultUnconditional();
+
+    motoron1.setSpeed(1, 0);
 }
 
 void set_motor_speed(int16_t speed) {
@@ -14,15 +27,10 @@ void set_motor_speed(int16_t speed) {
 
     if (speed >= 0) {
         // Forward
-        HAL_GPIO_WritePin(MOTOR1_DIR_GPIO_Port, MOTOR1_DIR_Pin, GPIO_PIN_SET);
+        motoron1.setSpeed(1, speed);
     } else {
         // Reverse
-        HAL_GPIO_WritePin(MOTOR1_DIR_GPIO_Port, MOTOR1_DIR_Pin, GPIO_PIN_RESET);
+        motoron1.setSpeed(1, speed);
     }
 
-    // Use abs() to make pulse_width positive
-    uint32_t pulse_width = abs(speed);
-
-    // Update the Timer Capture Compare Register
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, pulse_width);
 }
