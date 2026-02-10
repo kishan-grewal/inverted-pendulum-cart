@@ -1,31 +1,44 @@
 #include <Arduino.h>
 #include "drive.h"
+#include "encoder.h"
 
-// put function declarations here:
-int myFunction(int, int);
+float encoder_angle = 0.0;
+const float pulses_per_revolution = 1000;
 
 void setup() {
-  // put your setup code here, to run once:
-  // int result = myFunction(2, 3);
+  Serial.begin(115200);
+  while (!Serial && millis() < 3000) {
+    // Wait for Serial port to connect (up to 3 seconds)
+  }
+  
+  Serial.println("Initialising Motoron controller...");
   motor_setup();
+  Serial.println("Motoron initialisation complete.");
+
+  Serial.println("Initialising Encoder...");
+  encoder_setup();
+  Serial.println("Encoder initialisation complete.");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  set_motor_speed(1000);
-  delay(2000);
+  noInterrupts();
+  long current_count = pulse_count;
+  interrupts();
 
-  set_motor_speed(0);
-  delay(500);
+  Serial.print("Position (Pulses): ");
+  Serial.println(current_count);
 
-  set_motor_speed(-1000);
-  delay(2000);
+  encoder_angle = (current_count / pulses_per_revolution) * 360.0;
 
-  set_motor_speed(0);
-  delay(1000);
-}
+  if (encoder_angle > 360.0) {
+    encoder_angle = fmod(encoder_angle, 360.0);
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  } else if (encoder_angle < 0.0) {
+    encoder_angle += 360.0;
+  }
+
+  Serial.println("Encoder Angle (Degrees): " + String(encoder_angle, 2));
+
+  delay(50);
+
 }
