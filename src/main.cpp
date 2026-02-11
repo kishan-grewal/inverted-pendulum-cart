@@ -2,8 +2,13 @@
 #include "drive.h"
 #include "encoder.h"
 #include "control.h"
+#include "lqr.h"
+#include "motor_kalman.h"
 
-float encoder_angle = 0.0;
+MotorKalman kalman;
+LQRController lqr(2.0, 1.0, 0.5, 0.1); // Randon gains, need to be computed
+
+float pendulum_encoder_angle = 0.0;
 const float pulses_per_revolution = 1000;
 
 float error = 0.0;
@@ -38,16 +43,16 @@ void loop() {
   long current_count = pulse_count;
   interrupts();
 
-  encoder_angle = (current_count / pulses_per_revolution) * 360.0;
+  pendulum_encoder_angle = (current_count / pulses_per_revolution) * 360.0;
 
-  if (encoder_angle > 360.0) {
-    encoder_angle = fmod(encoder_angle, 360.0);
+  if (pendulum_encoder_angle > 360.0) {
+    pendulum_encoder_angle = fmod(pendulum_encoder_angle, 360.0);
 
-  } else if (encoder_angle < 0.0) {
-    encoder_angle += 360.0;
+  } else if (pendulum_encoder_angle < 0.0) {
+    pendulum_encoder_angle += 360.0;
   }
 
-  error = 180.0 - encoder_angle;
+  error = 180.0 - pendulum_encoder_angle;
   derivative = error - previous_error;
 
   t1 = millis();
@@ -60,9 +65,7 @@ void loop() {
 
   previous_error = error;
 
-  Serial.println("Encoder Angle (Degrees): " + String(encoder_angle, 2));
+  Serial.println("Encoder Angle (Degrees): " + String(pendulum_encoder_angle, 2));
   Serial.println("Control Signal: " + String(control_signal, 2));
-
-  delay(500);
 
 }
