@@ -3,9 +3,9 @@
 #include "encoder.h"
 #include "control.h"
 #include "lqr.h"
-#include "motor_kalman.h"
+#include "localisation_kalman.h"
 
-MotorKalman kalman;
+LocalisationKalman kalman;
 LQRController lqr(2.0, 1.0, 0.5, 0.1); // Randon gains, need to be computed
 
 float pendulum_encoder_angle = 0.0;
