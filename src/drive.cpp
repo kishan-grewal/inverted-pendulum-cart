@@ -1,44 +1,59 @@
 #include <Motoron.h>
 #include <Wire.h>
-#include "drive.h"
 
-MotoronI2C motoron1; // I2C address 0x10
+MotoronI2C motor_driver_front(17);
+MotoronI2C motor_driver_back(16);
 
+void motors_init()
+{
+  motor_driver_front.clearResetFlag();
+  motor_driver_back.clearResetFlag();
 
-void motor_setup() {
-    // Initialize I2C first, then set it for Motoron
-    Wire.begin();
-    motoron1.setBus(&Wire);
-    
-    // Reinitialize the Motoron controller
-    motoron1.reinitialize();
-    motoron1.disableCrc();
+  // left motor
+  motor_driver_front.setMaxAcceleration(1, 70);
+  motor_driver_front.setMaxDeceleration(1, 150);
+  // right motor
+  motor_driver_front.setMaxAcceleration(2, 70);
+  motor_driver_front.setMaxDeceleration(2, 150);
 
-    // Clear any reset flags
-    motoron1.clearResetFlag();
+  motor_driver_front.clearMotorFaultUnconditional();
 
-    // Set acceleration limits for motor 1
-    motoron1.setMaxAcceleration(1, 70);
-    motoron1.setMaxDeceleration(1, 150);
-    
-    // Set acceleration limits for motor 2 (if using both motors)
-    motoron1.setMaxAcceleration(2, 70);
-    motoron1.setMaxDeceleration(2, 150);
+  // left motor
+  motor_driver_back.setMaxAcceleration(1, 70);
+  motor_driver_back.setMaxDeceleration(1, 150);
+  // right motor
+  motor_driver_back.setMaxAcceleration(2, 70);
+  motor_driver_back.setMaxDeceleration(2, 150);
 
-    // Clear any motor faults
-    motoron1.clearMotorFaultUnconditional();
-
-    // Initialize both motors to zero speed
-    motoron1.setSpeed(1, 0);
-    motoron1.setSpeed(2, 0);
+  motor_driver_back.clearMotorFaultUnconditional();
 }
 
-void set_motor_speed(int16_t speed) {
-	// Limit speed
-    if (speed > 3200) speed = 3200;
-    if (speed < -3200) speed = -3200;
+void motor_setup()
+{
+  Wire1.begin();
+  
+  // Set the I2C bus for both motor controllers
+  motor_driver_front.setBus(&Wire1);
+  motor_driver_back.setBus(&Wire1);
+  
+  motor_driver_front.reinitialize();
+  motor_driver_back.reinitialize();
+  motors_init();
+}
 
-    motoron1.setSpeed(1, speed);
-    motoron1.setSpeed(2, speed);
+void set_motor_speed(int16_t speed)
+{
+  // Set all four motors to the same speed
+  motor_driver_front.setSpeed(1, speed);  // front motor 1
+  motor_driver_front.setSpeed(2, speed);  // front motor 2
+  motor_driver_back.setSpeed(1, speed);   // back motor 1
+  motor_driver_back.setSpeed(2, speed);   // back motor 2
+}
 
+void set_motor_speeds(int16_t front_left, int16_t front_right, int16_t back_left, int16_t back_right)
+{
+  motor_driver_front.setSpeed(1, front_left);
+  motor_driver_front.setSpeed(2, front_right);
+  motor_driver_back.setSpeed(1, back_left);
+  motor_driver_back.setSpeed(2, back_right);
 }

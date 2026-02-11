@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "drive.h"
 #include "encoder.h"
-#include "control.h"
+#include "motor_pid.h"
 #include "lqr.h"
 #include "localisation_kalman.h"
 
@@ -20,6 +20,12 @@ float control_signal = 0.0;
 unsigned long t0 = 0.0;
 unsigned long t1 = 0.0;
 float dt = 0.0;
+
+const float desired_speed = 1.0; // m/s
+float actual_speed_front_left = 0.0;
+float actual_speed_front_right = 0.0;
+float actual_speed_back_left = 0.0;
+float actual_speed_back_right = 0.0;
 
 void setup() {
   Serial.begin(115200);
@@ -65,7 +71,17 @@ void loop() {
 
   previous_error = error;
 
+  // Compute PID output for each motor
+  int16_t pid_front_left = compute_pid_front_left(desired_speed, actual_speed_front_left, dt);
+  int16_t pid_front_right = compute_pid_front_right(desired_speed, actual_speed_front_right, dt);
+  int16_t pid_back_left = compute_pid_back_left(desired_speed, actual_speed_back_left, dt);
+  int16_t pid_back_right = compute_pid_back_right(desired_speed, actual_speed_back_right, dt);
+
+  // Apply PID outputs to motors
+  set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+
   Serial.println("Encoder Angle (Degrees): " + String(pendulum_encoder_angle, 2));
   Serial.println("Control Signal: " + String(control_signal, 2));
+  Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
 
 }
