@@ -1,9 +1,9 @@
-#include "encoder.h"
+#include "pendulum_encoder.h"
 
-volatile long pulse_count = 0;
+volatile long pendulum_encoder_pulse_count = 0;
 
 
-void encoder_setup() {
+void pendulum_encoder_setup() {
     pinMode(encoderA, INPUT_PULLUP);
     pinMode(encoderB, INPUT_PULLUP);
     // pinMode(encoderI, INPUT_PULLUP);
@@ -20,9 +20,9 @@ void handle_A_rising() {
        If B is LOW, A is leading B (Clockwise)
        If B is HIGH, B is leading A (Counter-Clockwise) */
     if (digitalRead(encoderB) == LOW) {
-        pulse_count++; // CW
+        pendulum_encoder_pulse_count++; // CW
     } else {
-        pulse_count--; //CCW
+        pendulum_encoder_pulse_count--; //CCW
     }
 }
 
@@ -31,13 +31,13 @@ void handle_A_rising() {
 //        If A is HIGH, A transitioned first (Clockwise)
 //        If A is LOW, B transitioned first (Counter-Clockwise) */
 //     if (digitalRead(encoderA) == HIGH) {
-//         pulse_count++;
+//         pendulum_encoder_pulse_count++;
 //     } else {
-//         pulse_count--;
+//         pendulum_encoder_pulse_count--;
 //     }
 // }
 
 void handle_I_pulse() {
     // Reset pulse count to 0 once per full 360-degree rotation
-    pulse_count = 0;
+    pendulum_encoder_pulse_count = 0;
 }
