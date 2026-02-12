@@ -72,10 +72,10 @@ void loop() {
   float actual_speed_back_right = read_encoder_speed(3);
 
   // Kalman filter to estimate cart position and velocity
-  float z[4] = {actual_speed_front_left, actual_speed_front_right, actual_speed_back_left, actual_speed_back_right};
-  kalman.update(z, 4, dt);
-  float estimated_position = kalman.getPosition();
-  float estimated_velocity = kalman.getVelocity();
+  // float z[4] = {actual_speed_front_left, actual_speed_front_right, actual_speed_back_left, actual_speed_back_right};
+  // kalman.update(z, 4, dt);
+  // float estimated_position = kalman.getPosition();
+  // float estimated_velocity = kalman.getVelocity();
 
   // ==================== NEED TO ADD LQR HERE ====================
   // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
@@ -90,8 +90,8 @@ void loop() {
   set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
 
   // Debug output
-  Serial.println("Pendulum Encoder Angle (Degrees): " + String(pendulum_encoder_angle, 2));
-  Serial.println("Motor Speeds (m/s) [FL, FR, BL, BR]: " + String(actual_speed_front_left, 3) + ", " + String(actual_speed_front_right, 3) + ", " + String(actual_speed_back_left, 3) + ", " + String(actual_speed_back_right, 3));
+  // Serial.println("Pendulum Encoder Angle (Degrees): " + String(pendulum_encoder_angle, 2));
+  // Serial.println("Motor Speeds (m/s) [FL, FR, BL, BR]: " + String(actual_speed_front_left, 3) + ", " + String(actual_speed_front_right, 3) + ", " + String(actual_speed_back_left, 3) + ", " + String(actual_speed_back_right, 3));
   Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
   Serial.println("---");
 }
