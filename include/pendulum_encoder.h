@@ -3,9 +3,9 @@
 
 #include <Arduino.h>
 
-#define encoderA 2
-#define encoderB 3
-#define encoderI 4
+#define encoderA 53
+#define encoderB 51
+#define encoderI 49
 
 extern volatile long pendulum_encoder_pulse_count; 
 

@@ -6,33 +6,42 @@ long last_pulse_counts[4] = {0, 0, 0, 0};
 int last_state_A[4] = {0, 0, 0, 0};
 int last_state_B[4] = {0, 0, 0, 0};
 
-unsigned long last_speed_update_time = 0;
+// FIX 1: per-encoder timestamp array instead of a single shared value
+unsigned long last_speed_update_time[4] = {0, 0, 0, 0};
 
 const int encoder_pin_A[4] = {encoder_front_left_encoder_A, encoder_front_right_encoder_A, encoder_back_left_encoder_A, encoder_back_right_encoder_A};
 const int encoder_pin_B[4] = {encoder_front_left_encoder_B, encoder_front_right_encoder_B, encoder_back_left_encoder_B, encoder_back_right_encoder_B};
 
-const float PULSES_PER_REVOLUTION = 1000.0;  // Adjust to your encoder specs
-const float WHEEL_DIAMETER_MM = 70.0;       // Wheel diameter in millimeters
-const float WHEEL_CIRCUMFERENCE = WHEEL_DIAMETER_MM * PI / 1000.0;  // Convert to meters
-const float GEAR_RATIO = 9.7; 
+const float PULSES_PER_REVOLUTION = 1000.0;
+const float WHEEL_DIAMETER_MM = 70.0;
+const float WHEEL_CIRCUMFERENCE = WHEEL_DIAMETER_MM * PI / 1000.0;
+const float GEAR_RATIO = 9.7;
 
-// Speed smoothing using exponential moving average
-const float SPEED_FILTER_ALPHA = 0.8;  // 0.0-1.0, higher = more responsive, lower = more smoothed
+const float SPEED_FILTER_ALPHA = 0.8;
 float filtered_speed[4] = {0, 0, 0, 0};
 
+// FIX 4: named ISR wrappers instead of capturing lambdas
+void isr_encoder_0() { handle_encoder(0); }
+void isr_encoder_1() { handle_encoder(1); }
+void isr_encoder_2() { handle_encoder(2); }
+void isr_encoder_3() { handle_encoder(3); }
+
 void motor_encoder_setup() {
+    void (*isr_table[4])() = {isr_encoder_0, isr_encoder_1, isr_encoder_2, isr_encoder_3};
+
     for (int i = 0; i < 4; i++) {
         pinMode(encoder_pin_A[i], INPUT);
         pinMode(encoder_pin_B[i], INPUT);
 
         last_state_A[i] = digitalRead(encoder_pin_A[i]);
         last_state_B[i] = digitalRead(encoder_pin_B[i]);
-        
-        attachInterrupt(digitalPinToInterrupt(encoder_pin_A[i]), [i]() { handle_encoder(i); }, CHANGE);
-        attachInterrupt(digitalPinToInterrupt(encoder_pin_B[i]), [i]() { handle_encoder(i); }, CHANGE);
+
+        attachInterrupt(digitalPinToInterrupt(encoder_pin_A[i]), isr_table[i], CHANGE);
+        attachInterrupt(digitalPinToInterrupt(encoder_pin_B[i]), isr_table[i], CHANGE);
+
+        // FIX 1: initialise each encoder's timestamp individually
+        last_speed_update_time[i] = millis();
     }
-    
-    last_speed_update_time = millis();
 }
 
 void handle_encoder(int encoder_index) {
@@ -64,13 +73,13 @@ float read_encoder_speed(int encoder_index) {
     }
 
     unsigned long current_time = millis();
-    unsigned long time_elapsed = current_time - last_speed_update_time;
+    // FIX 1: use per-encoder timestamp
+    unsigned long time_elapsed = current_time - last_speed_update_time[encoder_index];
 
     if (time_elapsed == 0) {
-        return filtered_speed[encoder_index];  // Avoid division by zero
+        return filtered_speed[encoder_index];
     }
 
-    // Read pulse count safely
     noInterrupts();
     long current_pulse_count = motor_encoder_pulse_counts[encoder_index];
     interrupts();
@@ -78,18 +87,14 @@ float read_encoder_speed(int encoder_index) {
     long pulse_delta = current_pulse_count - last_pulse_counts[encoder_index];
 
     last_pulse_counts[encoder_index] = current_pulse_count;
-    last_speed_update_time = current_time;
+    // FIX 1: update per-encoder timestamp
+    last_speed_update_time[encoder_index] = current_time;
 
     float revolutions = pulse_delta / (PULSES_PER_REVOLUTION * GEAR_RATIO);
-
-    // Calculate linear distance (in meters)
     float distance_m = revolutions * WHEEL_CIRCUMFERENCE;
-
-    // Calculate speed (in m/s)
-    float time_s = time_elapsed / 1000.0;  // Convert milliseconds to seconds
+    float time_s = time_elapsed / 1000.0;
     float raw_speed = distance_m / time_s;
 
-    // Apply exponential moving average filter for smoothing
     filtered_speed[encoder_index] = (SPEED_FILTER_ALPHA * raw_speed) + ((1.0 - SPEED_FILTER_ALPHA) * filtered_speed[encoder_index]);
 
     return filtered_speed[encoder_index];
@@ -103,7 +108,7 @@ void reset_encoder(int encoder_index) {
     noInterrupts();
     motor_encoder_pulse_counts[encoder_index] = 0;
     interrupts();
-    
+
     last_pulse_counts[encoder_index] = 0;
     filtered_speed[encoder_index] = 0.0;
 }
@@ -124,6 +129,5 @@ float get_wheel_distance(int encoder_index) {
     interrupts();
 
     float revolutions = current_pulse_count / (PULSES_PER_REVOLUTION * GEAR_RATIO);
-
-    return revolutions * WHEEL_CIRCUMFERENCE;  // Distance in meters
+    return revolutions * WHEEL_CIRCUMFERENCE;
 }
