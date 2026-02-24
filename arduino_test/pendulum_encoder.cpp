@@ -1,14 +1,18 @@
 #include "pendulum_encoder.h"
 
 volatile long pendulum_encoder_pulse_count = 0;
-static int last_state_A = HIGH;
 
 
 void pendulum_encoder_setup() {
     pinMode(encoderA, INPUT_PULLUP);
     pinMode(encoderB, INPUT_PULLUP);
     pinMode(encoderI, INPUT_PULLUP);
-    last_state_A = digitalRead(encoderA);
+
+    // Attach separate handlers for A and B
+    attachInterrupt(digitalPinToInterrupt(encoderA), handle_A_rising, RISING);
+
+    // Index pulse for absolute zero
+    attachInterrupt(digitalPinToInterrupt(encoderI), handle_I_pulse, RISING);
 }
 
 void handle_A_rising() {
@@ -36,12 +40,4 @@ void handle_A_rising() {
 void handle_I_pulse() {
     // Reset pulse count to 0 once per full 360-degree rotation
     pendulum_encoder_pulse_count = 0;
-}
-
-void pendulum_encoder_poll() {
-    int state_A = digitalRead(encoderA);
-    if (state_A == HIGH && last_state_A == LOW) {
-        handle_A_rising();
-    }
-    last_state_A = state_A;
 }

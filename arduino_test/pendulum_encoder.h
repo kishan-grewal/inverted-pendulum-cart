@@ -10,7 +10,6 @@
 extern volatile long pendulum_encoder_pulse_count; 
 
 void pendulum_encoder_setup();
-void pendulum_encoder_poll();
 void handle_A_rising();
 // void handle_B_rising();
 void handle_I_pulse();

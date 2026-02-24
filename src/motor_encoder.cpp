@@ -6,7 +6,7 @@ long last_pulse_counts[4] = {0, 0, 0, 0};
 int last_state_A[4] = {0, 0, 0, 0};
 int last_state_B[4] = {0, 0, 0, 0};
 
-unsigned long last_speed_update_time = 0;
+unsigned long last_speed_update_time[4] = {0, 0, 0, 0};
 
 const int encoder_pin_A[4] = {encoder_front_left_encoder_A, encoder_front_right_encoder_A, encoder_back_left_encoder_A, encoder_back_right_encoder_A};
 const int encoder_pin_B[4] = {encoder_front_left_encoder_B, encoder_front_right_encoder_B, encoder_back_left_encoder_B, encoder_back_right_encoder_B};
@@ -20,42 +20,35 @@ const float GEAR_RATIO = 9.7;
 const float SPEED_FILTER_ALPHA = 0.8;  // 0.0-1.0, higher = more responsive, lower = more smoothed
 float filtered_speed[4] = {0, 0, 0, 0};
 
+void isr_encoder_0() { handle_encoder(0); }
+void isr_encoder_1() { handle_encoder(1); }
+void isr_encoder_2() { handle_encoder(2); }
+void isr_encoder_3() { handle_encoder(3); }
+
 void motor_encoder_setup() {
+    void (*isr_table[4])() = {isr_encoder_0, isr_encoder_1, isr_encoder_2, isr_encoder_3};
+
     for (int i = 0; i < 4; i++) {
-        pinMode(encoder_pin_A[i], INPUT);
-        pinMode(encoder_pin_B[i], INPUT);
+        pinMode(encoder_pin_A[i], INPUT_PULLUP);
+        pinMode(encoder_pin_B[i], INPUT_PULLUP);
 
         last_state_A[i] = digitalRead(encoder_pin_A[i]);
         last_state_B[i] = digitalRead(encoder_pin_B[i]);
-        
-        attachInterrupt(digitalPinToInterrupt(encoder_pin_A[i]), [i]() { handle_encoder(i); }, CHANGE);
-        attachInterrupt(digitalPinToInterrupt(encoder_pin_B[i]), [i]() { handle_encoder(i); }, CHANGE);
+
+        // Use one interrupt channel per encoder for safer bring-up on STM32 EXTI.
+        attachInterrupt(digitalPinToInterrupt(encoder_pin_A[i]), isr_table[i], RISING);
+
+        last_speed_update_time[i] = millis();
     }
-    
-    last_speed_update_time = millis();
 }
 
 void handle_encoder(int encoder_index) {
-    int state_A = digitalRead(encoder_pin_A[encoder_index]);
     int state_B = digitalRead(encoder_pin_B[encoder_index]);
-
-    if (state_A != last_state_A[encoder_index]) {
-        if (last_state_A[encoder_index] != last_state_B[encoder_index]) {
-            motor_encoder_pulse_counts[encoder_index]++;
-        } else {
-            motor_encoder_pulse_counts[encoder_index]--;
-        }
+    if (state_B == LOW) {
+        motor_encoder_pulse_counts[encoder_index]++;
+    } else {
+        motor_encoder_pulse_counts[encoder_index]--;
     }
-    else if (state_B != last_state_B[encoder_index]) {
-        if (state_A == state_B) {
-            motor_encoder_pulse_counts[encoder_index]++;
-        } else {
-            motor_encoder_pulse_counts[encoder_index]--;
-        }
-    }
-
-    last_state_A[encoder_index] = state_A;
-    last_state_B[encoder_index] = state_B;
 }
 
 float read_encoder_speed(int encoder_index) {
@@ -64,7 +57,7 @@ float read_encoder_speed(int encoder_index) {
     }
 
     unsigned long current_time = millis();
-    unsigned long time_elapsed = current_time - last_speed_update_time;
+    unsigned long time_elapsed = current_time - last_speed_update_time[encoder_index];
 
     if (time_elapsed == 0) {
         return filtered_speed[encoder_index];  // Avoid division by zero
@@ -78,7 +71,7 @@ float read_encoder_speed(int encoder_index) {
     long pulse_delta = current_pulse_count - last_pulse_counts[encoder_index];
 
     last_pulse_counts[encoder_index] = current_pulse_count;
-    last_speed_update_time = current_time;
+    last_speed_update_time[encoder_index] = current_time;
 
     float revolutions = pulse_delta / (PULSES_PER_REVOLUTION * GEAR_RATIO);
 
