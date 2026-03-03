@@ -12,7 +12,7 @@ LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
 
 float pendulum_encoder_angle = 0.0;
 const float pendulum_pulses_per_revolution = 1000;
-#define CALIBRATION_OFFSET_DEG (-65.330f)
+#define CALIBRATION_OFFSET_DEG (-78.84f)
 
 unsigned long t0 = 0;
 unsigned long t1 = 0;
@@ -29,7 +29,7 @@ void setup() {
   Serial.flush();
 
   Serial.println("Initialising Motoron controller...");
-  motor_setup();
+  //motor_setup();
   Serial.println("Motoron initialisation complete.");
 
   Serial.println("Initialising Pendulum Encoder...");
@@ -37,7 +37,7 @@ void setup() {
   Serial.println("Pendulum Encoder initialisation complete.");
 
   Serial.println("Initialising Motor Encoders...");
-  motor_encoder_setup();
+  //motor_encoder_setup();
   Serial.println("Motor Encoder initialisation complete.");
 
   Serial.println("Setup complete. Entering loop.");
@@ -60,7 +60,8 @@ void loop() {
     pendulum_encoder_angle += 360.0;
   }
   pendulum_encoder_angle += CALIBRATION_OFFSET_DEG;
-  // Wrap to [-180, 180] so 0 = vertical (angle from vertical)
+
+  // Wrap to [-180, 180]
   if (pendulum_encoder_angle > 180.0f) {
     pendulum_encoder_angle -= 360.0f;
   } else if (pendulum_encoder_angle < -180.0f) {
@@ -101,18 +102,18 @@ void loop() {
   // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
 
   // Compute PID output for each motor
-  int16_t pid_front_left = compute_pid_front_left(desired_speed, actual_speed_front_left, dt);
-  int16_t pid_front_right = compute_pid_front_right(desired_speed, actual_speed_front_right, dt);
-  int16_t pid_back_left = compute_pid_back_left(desired_speed, actual_speed_back_left, dt);
-  int16_t pid_back_right = compute_pid_back_right(desired_speed, actual_speed_back_right, dt);
+  // int16_t pid_front_left = compute_pid_front_left(desired_speed, actual_speed_front_left, dt);
+  // int16_t pid_front_right = compute_pid_front_right(desired_speed, actual_speed_front_right, dt);
+  // int16_t pid_back_left = compute_pid_back_left(desired_speed, actual_speed_back_left, dt);
+  // int16_t pid_back_right = compute_pid_back_right(desired_speed, actual_speed_back_right, dt);
 
   // Apply PID outputs to motors
-  set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+  // set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
 
   // Debug output (throttled, same 100 ms as above)
   if (do_print) {
     Serial.println("Pendulum Angle: " + String(pendulum_encoder_angle));
-    Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
+    // Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
     Serial.println("---");
   }
 }

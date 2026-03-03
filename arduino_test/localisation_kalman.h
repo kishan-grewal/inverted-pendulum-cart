@@ -31,19 +31,19 @@ class LocalisationKalman {
     static constexpr float g       = 9.81f;
     static constexpr float M_t     = M_cart + m_pend;
     static constexpr float ml      = m_pend * l_com;
-    static constexpr float D0      = M_t * I_pivot - ml * ml;
+    static constexpr float D_denom = M_t * I_pivot - ml * ml;
 
     // Non-zero off-diagonal elements of linearised A matrix
-    static constexpr float A21 = -(I_pivot * b_x) / D0;
-    static constexpr float A23 = -(ml * ml * g)   / D0;
-    static constexpr float A24 =  (ml * b_theta)  / D0;
-    static constexpr float A42 =  (ml * b_x)      / D0;
-    static constexpr float A43 =  (M_t * ml * g)  / D0;
-    static constexpr float A44 = -(M_t * b_theta)  / D0;
+    static constexpr float A21 = -(I_pivot * b_x) / D_denom;
+    static constexpr float A23 = -(ml * ml * g)   / D_denom;
+    static constexpr float A24 =  (ml * b_theta)  / D_denom;
+    static constexpr float A42 =  (ml * b_x)      / D_denom;
+    static constexpr float A43 =  (M_t * ml * g)  / D_denom;
+    static constexpr float A44 = -(M_t * b_theta)  / D_denom;
 
     // Input matrix B elements
-    static constexpr float B2  =  I_pivot / D0;
-    static constexpr float B4  = -ml      / D0;
+    static constexpr float B2  =  I_pivot / D_denom;
+    static constexpr float B4  = -ml      / D_denom;
 
     // Process noise (diagonal)
     float Q[4] = {0.001f, 0.01f, 0.0001f, 0.01f};
