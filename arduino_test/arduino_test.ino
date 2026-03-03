@@ -60,6 +60,12 @@ void loop() {
     pendulum_encoder_angle += 360.0;
   }
   pendulum_encoder_angle += CALIBRATION_OFFSET_DEG;
+  // Wrap to [-180, 180] so 0 = vertical (angle from vertical)
+  if (pendulum_encoder_angle > 180.0f) {
+    pendulum_encoder_angle -= 360.0f;
+  } else if (pendulum_encoder_angle < -180.0f) {
+    pendulum_encoder_angle += 360.0f;
+  }
 
   // Calculate time delta
   unsigned long current_time = millis();

@@ -103,8 +103,8 @@ def segment_means(time_s, angle_deg, segments):
     return np.array(means), angle_arrays
 
 
-def unwrap_front_angles(angles_deg):
-    """Convert angles in [270, 360) to negative so mean is near 0."""
+def unwrap_angles_180(angles_deg):
+    """Convert to [-180, 180] so averaging gives the correct geometric middle."""
     out = np.array(angles_deg, dtype=float)
     out[out > 180] -= 360
     return out
@@ -113,6 +113,7 @@ def unwrap_front_angles(angles_deg):
 def compute_offset_from_order(angle_arrays):
     """
     Use temporal order: segment 0 = front, segment 1 = back, segment 2 = front.
+    Unwrap both plateaus to [-180, 180] so the midpoint is vertical (0°).
     Returns (offset, front_center, back_center, middle, n_front, n_back).
     """
     if len(angle_arrays) < 3:
@@ -127,9 +128,11 @@ def compute_offset_from_order(angle_arrays):
     front_angles = np.concatenate([angle_arrays[0], angle_arrays[2]])
     back_angles = angle_arrays[1]
 
-    front_unwrapped = unwrap_front_angles(front_angles)
+    # Unwrap both to [-180, 180] so midpoint is correct (e.g. front 5° and back 355° → -5°)
+    front_unwrapped = unwrap_angles_180(front_angles)
+    back_unwrapped = unwrap_angles_180(back_angles)
     front_center = float(np.mean(front_unwrapped))
-    back_center = float(np.mean(back_angles))
+    back_center = float(np.mean(back_unwrapped))
     middle = (front_center + back_center) / 2.0
     offset = -middle
     return offset, front_center, back_center, middle, len(front_angles), len(back_angles)
@@ -170,6 +173,9 @@ def main():
     print(f"     #define CALIBRATION_OFFSET_DEG  ({offset:.3f}f)")
     print("  2. After the block that wraps pendulum_encoder_angle to [0, 360), add:")
     print("     pendulum_encoder_angle += CALIBRATION_OFFSET_DEG;")
+    print("     // Wrap to [-180, 180] so 0 = vertical")
+    print("     if (pendulum_encoder_angle > 180.0f) pendulum_encoder_angle -= 360.0f;")
+    print("     else if (pendulum_encoder_angle < -180.0f) pendulum_encoder_angle += 360.0f;")
     print()
 
     if args.write_offset_file:
