@@ -13,6 +13,7 @@ LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
 float pendulum_encoder_angle = 0.0;
 const float pendulum_pulses_per_revolution = 1000;
 #define CALIBRATION_OFFSET_DEG (-78.84f)
+#define CALIBRATION_OFFSET_DEG (0.0f)
 
 unsigned long t0 = 0;
 unsigned long t1 = 0;
@@ -86,7 +87,7 @@ void loop() {
 
   // Throttle serial to avoid buffer overflow / watchdog; print every ~100 ms
   static unsigned long last_print = 0;
-  bool do_print = (current_time - last_print >= 100);
+  bool do_print = (current_time - last_print >= 50);
   if (do_print) {
     last_print = current_time;
     Serial.println("Encoder Speeds (m/s) [FL, FR, BL, BR]: " + String(actual_speed_front_left, 3) + ", " + String(actual_speed_front_right, 3) + ", " + String(actual_speed_back_left, 3) + ", " + String(actual_speed_back_right, 3));
