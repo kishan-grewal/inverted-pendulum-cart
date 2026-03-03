@@ -12,7 +12,7 @@ LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
 
 float pendulum_encoder_angle = 0.0;
 const float pendulum_pulses_per_revolution = 1000;
-#define CALIBRATION_OFFSET_DEG (-11.879f)
+#define CALIBRATION_OFFSET_DEG (-65.330f)
 
 unsigned long t0 = 0;
 unsigned long t1 = 0;
