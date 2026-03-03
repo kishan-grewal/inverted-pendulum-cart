@@ -87,7 +87,7 @@ void loop() {
 
   // Throttle serial to avoid buffer overflow / watchdog; print every ~100 ms
   static unsigned long last_print = 0;
-  bool do_print = (current_time - last_print >= 50);
+  bool do_print = (current_time - last_print >= 100);
   if (do_print) {
     last_print = current_time;
     Serial.println("Encoder Speeds (m/s) [FL, FR, BL, BR]: " + String(actual_speed_front_left, 3) + ", " + String(actual_speed_front_right, 3) + ", " + String(actual_speed_back_left, 3) + ", " + String(actual_speed_back_right, 3));

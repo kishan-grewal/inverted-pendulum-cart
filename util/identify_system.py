@@ -141,9 +141,9 @@ def plot_window(times: np.ndarray, angles_deg: np.ndarray, omega_n=None, zeta=No
     fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
     ax0, ax1 = axes[0], axes[1]
 
-    ax0.plot(times, angles_deg, color="C0", label="Angle (deg, down = 0)")
+    ax0.plot(times, angles_deg, color="C0", label="Angle (deg, 0 = equilibrium)")
     ax0.set_ylabel("Angle (deg)")
-    ax0.set_title("Pendulum angle (subset for identification)")
+    ax0.set_title("Pendulum angle (shifted so 0 = oscillation equilibrium)")
     ax0.grid(True)
     ax0.legend(loc="upper right")
     if omega_n is not None and f_n is not None and T is not None:
@@ -172,7 +172,7 @@ def plot_window(times: np.ndarray, angles_deg: np.ndarray, omega_n=None, zeta=No
 
     fig2, ax2 = plt.subplots(1, 1, figsize=(7, 6))
     ax2.plot(angles_deg, omega, color="C2", alpha=0.7)
-    ax2.set_xlabel("Angle (deg, down = 0)")
+    ax2.set_xlabel("Angle (deg, 0 = equilibrium)")
     ax2.set_ylabel("Angular velocity (rad/s)")
     ax2.set_title("Phase portrait (subset)")
     ax2.grid(True)
@@ -189,10 +189,15 @@ def main():
         times_all, angles_deg_all, args.t_start, args.t_end
     )
 
+    # Equilibrium = mean angle in window (center of oscillation); shift so 0 = equilibrium
+    equilibrium_deg = float(np.mean(angles_deg_win))
+    angles_deg_centered = angles_deg_win - equilibrium_deg
+
     print(f"Loaded {len(times_all)} samples from {args.file}")
     print(f"Using window [{t_start:.3f}, {t_end:.3f}] s with {len(times_win)} samples.")
+    print(f"Equilibrium (mean angle in window): {equilibrium_deg:.4f} deg → angles shifted so 0 = equilibrium.")
 
-    omega_n, zeta, f_n, T = identify_pendulum(times_win, angles_deg_win)
+    omega_n, zeta, f_n, T = identify_pendulum(times_win, angles_deg_centered)
     if omega_n is None:
         print("System identification failed or insufficient data.")
         return
@@ -204,7 +209,7 @@ def main():
     print(f"  T       = {T:.6f} s")
 
     if not args.no_plot:
-        plot_window(times_win, angles_deg_win, omega_n=omega_n, zeta=zeta, f_n=f_n, T=T)
+        plot_window(times_win, angles_deg_centered, omega_n=omega_n, zeta=zeta, f_n=f_n, T=T)
 
 
 if __name__ == "__main__":
