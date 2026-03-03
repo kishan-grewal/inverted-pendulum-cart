@@ -3,17 +3,22 @@
 
 #include <Arduino.h>
 
-#define encoder_front_left_encoder_A 2
-#define encoder_front_left_encoder_B 3
+#define encoder_front_right_encoder_A 22
+#define encoder_front_right_encoder_B 23
 
-#define encoder_front_right_encoder_A 5
-#define encoder_front_right_encoder_B 6
+#define encoder_back_right_encoder_A 25
+#define encoder_back_right_encoder_B 26
 
-#define encoder_back_left_encoder_A 8
-#define encoder_back_left_encoder_B 9
+#define encoder_front_left_encoder_A 27
+#define encoder_front_left_encoder_B 28
 
-#define encoder_back_right_encoder_A 11
-#define encoder_back_right_encoder_B 12
+#define encoder_back_left_encoder_A 29
+#define encoder_back_left_encoder_B 30
+
+extern volatile long encoder_front_left_pulse_count;
+extern volatile long encoder_front_right_pulse_count;
+extern volatile long encoder_back_left_pulse_count;
+extern volatile long encoder_back_right_pulse_count;
 
 void motor_encoder_setup();
 void handle_encoder(int encoder_index);
