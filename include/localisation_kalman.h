@@ -3,57 +3,120 @@
 
 class LocalisationKalman {
   private:
-    float x = 0.0f; 
-    float v = 0.0f;
+    // State: [x, v, theta, theta_v]
+    float x       = 0.0f;
+    float v       = 0.0f;
+    float theta   = 0.0f;
+    float theta_v = 0.0f;
 
-    float P00 = 1.0f, P01 = 0.0f;
-    float P10 = 0.0f, P11 = 1.0f;
+    float P[4][4] = {
+      {1.0f, 0.0f, 0.0f, 0.0f},
+      {0.0f, 1.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, 1.0f, 0.0f},
+      {0.0f, 0.0f, 0.0f, 1.0f}
+    };
 
-    float Q_pos = 0.01f; 
-    float Q_vel = 0.1f;
-    
-    // Measurement noise for each individual encoder
-    float R_pos = 0.05f; 
+    // Physical parameters (from dynamics.py)
+    static constexpr float M_cart  = 0.828f;
+    static constexpr float m_rod   = 0.0225f;
+    static constexpr float m_tip   = 0.050f;
+    static constexpr float m_pend  = m_rod + m_tip;
+    static constexpr float L_rod   = 0.6f;
+    static constexpr float l_com   = (m_rod * L_rod / 2.0f + m_tip * L_rod) / m_pend;
+    static constexpr float I_pivot = (1.0f/12.0f)*m_rod*L_rod*L_rod
+                                   + m_rod*(L_rod/2.0f)*(L_rod/2.0f)
+                                   + m_tip*L_rod*L_rod;
+    static constexpr float b_x     = 0.1f;
+    static constexpr float b_theta = 0.001f;
+    static constexpr float g       = 9.81f;
+    static constexpr float M_t     = M_cart + m_pend;
+    static constexpr float ml      = m_pend * l_com;
+    static constexpr float D0      = M_t * I_pivot - ml * ml;
 
-  public:
-    void update(float z[], int num_sensors, float dt) {
-      // 1. PREDICT step (Physics stays the same)
-      x = x + (v * dt);
-      P00 = P00 + dt * (P10 + P01) + dt * dt * P11 + Q_pos;
-      P01 = P01 + dt * P11;
-      P10 = P10 + dt * P11;
-      P11 = P11 + Q_vel;
+    // Non-zero off-diagonal elements of linearised A matrix
+    static constexpr float A21 = -(I_pivot * b_x) / D0;
+    static constexpr float A23 = -(ml * ml * g)   / D0;
+    static constexpr float A24 =  (ml * b_theta)  / D0;
+    static constexpr float A42 =  (ml * b_x)      / D0;
+    static constexpr float A43 =  (M_t * ml * g)  / D0;
+    static constexpr float A44 = -(M_t * b_theta)  / D0;
 
-      // 2. FUSION UPDATE step
-      // We calculate an average measurement (z_avg) or iterate the update.
-      // For 4 identical encoders, the simplest robust way is to fuse the average:
-      float z_combined = 0;
-      for(int i = 0; i < num_sensors; i++) {
-          z_combined += z[i];
-      }
-      float z_avg = z_combined / num_sensors;
+    // Input matrix B elements
+    static constexpr float B2  =  I_pivot / D0;
+    static constexpr float B4  = -ml      / D0;
 
-      // Effective R decreases because we have more sensors!
-      // R_eff = R / n
-      float R_eff = R_pos / num_sensors; 
+    // Process noise (diagonal)
+    float Q[4] = {0.001f, 0.01f, 0.0001f, 0.01f};
 
-      // Standard Update with fused values
-      float y = z_avg - x;
-      float S = P00 + R_eff;
-      float K0 = P00 / S;
-      float K1 = P10 / S;
+    // Measurement noise
+    float R_cart     = 0.05f;   // per wheel encoder [m]
+    float R_pendulum = 0.005f;  // pendulum encoder [rad]
 
-      x += K0 * y;
-      v += K1 * y;
+    // Sequential scalar Kalman update for state at index h_idx
+    void scalarUpdate(int h_idx, float innov, float R_eff) {
+      float S = P[h_idx][h_idx] + R_eff;
+      float K[4];
+      for (int i = 0; i < 4; i++) K[i] = P[i][h_idx] / S;
 
-      P00 = (1 - K0) * P00;
-      P01 = (1 - K0) * P01;
-      P10 = -K1 * P00 + P10;
-      P11 = -K1 * P01 + P11;
+      x       += K[0] * innov;
+      v       += K[1] * innov;
+      theta   += K[2] * innov;
+      theta_v += K[3] * innov;
+
+      for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+          P[i][j] -= K[i] * P[h_idx][j];
     }
 
-    float getPosition() { return x; }
-    float getVelocity() { return v; }
+  public:
+    // u:       control force on cart [N]
+    // z_cart:  position from each wheel encoder [m] (integrate velocity before passing in)
+    // num_cart: number of wheel encoders (4)
+    // z_theta: pendulum angle [rad], 0 = upright
+    // dt:      time step [s]
+    void update(float u, float z_cart[], int num_cart, float z_theta, float dt) {
+
+      // 1. PREDICT: x_new = x + A*x*dt + B*u*dt  (Euler, linearised about upright)
+      float dx       =  v * dt;
+      float dv       = (A21*v + A23*theta + A24*theta_v) * dt + B2*u*dt;
+      float dtheta   =  theta_v * dt;
+      float dtheta_v = (A42*v + A43*theta + A44*theta_v) * dt + B4*u*dt;
+
+      x       += dx;
+      v       += dv;
+      theta   += dtheta;
+      theta_v += dtheta_v;
+
+      // Propagate covariance: P = F*P*F' + Q, where F = I + A*dt
+      float FP[4][4];
+      for (int j = 0; j < 4; j++) {
+        FP[0][j] = P[0][j] + dt * P[1][j];
+        FP[1][j] = P[1][j] + dt * (A21*P[1][j] + A23*P[2][j] + A24*P[3][j]);
+        FP[2][j] = P[2][j] + dt * P[3][j];
+        FP[3][j] = P[3][j] + dt * (A42*P[1][j] + A43*P[2][j] + A44*P[3][j]);
+      }
+      for (int i = 0; i < 4; i++) {
+        P[i][0] = FP[i][0] + dt * FP[i][1];
+        P[i][1] = FP[i][1] + dt * (A21*FP[i][1] + A23*FP[i][2] + A24*FP[i][3]);
+        P[i][2] = FP[i][2] + dt * FP[i][3];
+        P[i][3] = FP[i][3] + dt * (A42*FP[i][1] + A43*FP[i][2] + A44*FP[i][3]);
+      }
+      for (int i = 0; i < 4; i++) P[i][i] += Q[i];
+
+      // 2. UPDATE: cart position (H = [1,0,0,0])
+      float z_avg = 0.0f;
+      for (int i = 0; i < num_cart; i++) z_avg += z_cart[i];
+      z_avg /= num_cart;
+      scalarUpdate(0, z_avg - x, R_cart / num_cart);
+
+      // 3. UPDATE: pendulum angle (H = [0,0,1,0])
+      scalarUpdate(2, z_theta - theta, R_pendulum);
+    }
+
+    float getPosition()      { return x; }
+    float getVelocity()      { return v; }
+    float getTheta()         { return theta; }
+    float getThetaVelocity() { return theta_v; }
 };
 
 #endif

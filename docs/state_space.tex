@@ -1,0 +1,441 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{siunitx}
+\usepackage{float}
+
+\geometry{margin=2.5cm}
+
+\title{State-Space Representation of the Inverted Cart-Pendulum System}
+\author{Systems Engineering Project}
+\date{}
+
+\begin{document}
+\maketitle
+
+%=============================================================================
+\section{System Description}
+%=============================================================================
+
+The inverted pendulum on a cart is a classic underactuated mechanical system. A pendulum of mass $m$ is attached via a frictionless pivot to a cart of mass $M$ that moves along a horizontal track. A horizontal force $F$ is applied to the cart as the control input.
+
+\subsection{State Variables}
+
+The system state is described by a 4-dimensional state vector:
+\begin{equation}
+    \mathbf{x} = \begin{bmatrix} x \\ \dot{x} \\ \theta \\ \dot{\theta} \end{bmatrix}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $x$ -- cart position [\si{\metre}]
+    \item $\dot{x}$ -- cart velocity [\si{\metre\per\second}]
+    \item $\theta$ -- pendulum angle from vertical [\si{\radian}], with $\theta = 0$ being upright
+    \item $\dot{\theta}$ -- pendulum angular velocity [\si{\radian\per\second}]
+\end{itemize}
+
+\subsection{Sign Conventions}
+\begin{itemize}
+    \item Positive $x$: rightward displacement
+    \item Positive $\theta$: pendulum tilted right from upright
+    \item Positive $F$: rightward force on cart
+\end{itemize}
+
+%=============================================================================
+\section{System Parameters}
+%=============================================================================
+
+\begin{table}[H]
+\centering
+\caption{Physical parameters of the cart-pendulum system}
+\begin{tabular}{@{}llrl@{}}
+\toprule
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Value} & \textbf{Unit} \\
+\midrule
+Cart mass & $M$ & 1.294 & \si{\kilogram} \\
+Pendulum mass (rod + tip) & $m$ & 0.0725 & \si{\kilogram} \\
+Total translating mass & $M_t = M + m$ & 1.3665 & \si{\kilogram} \\
+Rod length & $L$ & 0.6 & \si{\metre} \\
+Distance from pivot to CoM & $\ell$ & 0.5172 & \si{\metre} \\
+Moment of inertia about pivot & $I$ & 0.0286 & \si{\kilogram\metre\squared} \\
+Cart viscous friction & $b_x$ & 0.1 & \si{\newton\second\per\metre} \\
+Pivot viscous friction & $b_\theta$ & 0.001 & \si{\newton\metre\second\per\radian} \\
+Air drag coefficient & $c_d$ & 0.002 & \si{\newton\metre\second\squared\per\radian\squared} \\
+Gravitational acceleration & $g$ & 9.81 & \si{\metre\per\second\squared} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Derived Quantities}
+
+The mass-length product is a frequently appearing quantity:
+\begin{equation}
+    m\ell = (0.0725)(0.5172) \approx \SI{0.0375}{\kilogram\metre}
+\end{equation}
+
+The moment of inertia about the pivot is computed using the parallel axis theorem:
+\begin{align}
+    I_{\text{rod,pivot}} &= \frac{1}{12}m_{\text{rod}}L^2 + m_{\text{rod}}\left(\frac{L}{2}\right)^2 = \frac{1}{3}m_{\text{rod}}L^2 \\
+    I_{\text{tip,pivot}} &= m_{\text{tip}}L^2 \\
+    I &= I_{\text{rod,pivot}} + I_{\text{tip,pivot}}
+\end{align}
+
+The location of the composite centre of mass from the pivot:
+\begin{equation}
+    \ell = \frac{m_{\text{rod}} \cdot \frac{L}{2} + m_{\text{tip}} \cdot L}{m_{\text{rod}} + m_{\text{tip}}}
+\end{equation}
+
+%=============================================================================
+\section{Nonlinear Equations of Motion}
+%=============================================================================
+
+The equations of motion are derived from Lagrangian mechanics with dissipative forces.
+
+\subsection{Energy Formulation}
+
+\textbf{Kinetic Energy:}
+\begin{equation}
+    T = \frac{1}{2}(M + m)\dot{x}^2 + m\ell\dot{x}\dot{\theta}\cos\theta + \frac{1}{2}I\dot{\theta}^2
+\end{equation}
+
+\textbf{Potential Energy:}
+\begin{equation}
+    V = mg\ell\cos\theta
+\end{equation}
+
+\textbf{Lagrangian:}
+\begin{equation}
+    \mathcal{L} = T - V
+\end{equation}
+
+\subsection{Coupled Differential Equations}
+
+Applying the Euler-Lagrange equations with dissipation yields two coupled second-order ODEs:
+
+\textbf{Cart equation:}
+\begin{equation}
+    (M + m)\ddot{x} + m\ell\cos\theta\,\ddot{\theta} = F - b_x\dot{x} + m\ell\dot{\theta}^2\sin\theta
+    \label{eq:cart}
+\end{equation}
+
+\textbf{Pendulum equation:}
+\begin{equation}
+    m\ell\cos\theta\,\ddot{x} + I\ddot{\theta} = mg\ell\sin\theta - b_\theta\dot{\theta} - c_d\dot{\theta}|\dot{\theta}|
+    \label{eq:pendulum}
+\end{equation}
+
+\subsection{Matrix Form}
+
+The coupled equations can be written in matrix form:
+\begin{equation}
+    \underbrace{\begin{bmatrix} M_t & m\ell\cos\theta \\ m\ell\cos\theta & I \end{bmatrix}}_{\mathbf{M}(\theta)}
+    \begin{bmatrix} \ddot{x} \\ \ddot{\theta} \end{bmatrix}
+    =
+    \begin{bmatrix} F - b_x\dot{x} + m\ell\dot{\theta}^2\sin\theta \\ mg\ell\sin\theta - b_\theta\dot{\theta} - c_d\dot{\theta}|\dot{\theta}| \end{bmatrix}
+\end{equation}
+
+where $M_t = M + m$ is the total translating mass.
+
+\subsection{Explicit Solution for Accelerations}
+
+Defining the determinant:
+\begin{equation}
+    D(\theta) = M_t I - (m\ell\cos\theta)^2
+\end{equation}
+
+and the forcing terms:
+\begin{align}
+    f_1 &= F - b_x\dot{x} + m\ell\dot{\theta}^2\sin\theta \\
+    f_2 &= mg\ell\sin\theta - b_\theta\dot{\theta} - c_d\dot{\theta}|\dot{\theta}|
+\end{align}
+
+The accelerations are obtained by Cramer's rule:
+\begin{align}
+    \ddot{x} &= \frac{I \cdot f_1 - m\ell\cos\theta \cdot f_2}{D(\theta)} \label{eq:xddot}\\[1ex]
+    \ddot{\theta} &= \frac{M_t \cdot f_2 - m\ell\cos\theta \cdot f_1}{D(\theta)} \label{eq:thetaddot}
+\end{align}
+
+%=============================================================================
+\section{Linearised State-Space Model}
+%=============================================================================
+
+For control design, the nonlinear system is linearised about the unstable upright equilibrium point:
+\begin{equation}
+    \mathbf{x}_{\text{eq}} = \begin{bmatrix} 0 \\ 0 \\ 0 \\ 0 \end{bmatrix}, \quad u_{\text{eq}} = 0
+\end{equation}
+
+\subsection{Linearisation Assumptions}
+
+At the equilibrium point ($\theta = 0$, $\dot{\theta} = 0$):
+\begin{itemize}
+    \item $\cos\theta \approx 1$
+    \item $\sin\theta \approx \theta$
+    \item $\dot{\theta}^2 \approx 0$ (second-order small)
+    \item Quadratic air drag $c_d\dot{\theta}|\dot{\theta}| \approx 0$ (linearises to zero)
+\end{itemize}
+
+\subsection{Linearised Equations}
+
+Applying small-angle approximations to Equations~\eqref{eq:cart} and \eqref{eq:pendulum}:
+\begin{align}
+    M_t\ddot{x} + m\ell\ddot{\theta} &= F - b_x\dot{x} \\
+    m\ell\ddot{x} + I\ddot{\theta} &= mg\ell\theta - b_\theta\dot{\theta}
+\end{align}
+
+The determinant at equilibrium becomes:
+\begin{equation}
+    D_0 = M_t I - (m\ell)^2
+\end{equation}
+
+\subsection{State-Space Representation}
+
+The linearised system takes the standard state-space form:
+\begin{equation}
+    \dot{\mathbf{x}} = \mathbf{A}\mathbf{x} + \mathbf{B}u
+\end{equation}
+\begin{equation}
+    \mathbf{y} = \mathbf{C}\mathbf{x} + \mathbf{D}u
+\end{equation}
+
+where $u = F$ is the control input (force on cart).
+
+\subsubsection{System Matrix $\mathbf{A}$}
+
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix}
+        0 & 1 & 0 & 0 \\[0.5ex]
+        0 & -\dfrac{Ib_x}{D_0} & -\dfrac{(m\ell)^2 g}{D_0} & \dfrac{m\ell b_\theta}{D_0} \\[2ex]
+        0 & 0 & 0 & 1 \\[0.5ex]
+        0 & \dfrac{m\ell b_x}{D_0} & \dfrac{M_t m\ell g}{D_0} & -\dfrac{M_t b_\theta}{D_0}
+    \end{bmatrix}
+\end{equation}
+
+With the given parameters:
+\begin{equation}
+    D_0 = (1.3665)(0.0286) - (0.0375)^2 \approx \SI{0.0377}{\kilogram\squared\metre\squared}
+\end{equation}
+
+The numerical $\mathbf{A}$ matrix:
+\begin{equation}
+    \mathbf{A} \approx \begin{bmatrix}
+        0 & 1 & 0 & 0 \\
+        0 & -0.076 & -0.366 & 0.001 \\
+        0 & 0 & 0 & 1 \\
+        0 & 0.099 & 5.12 & -0.036
+    \end{bmatrix}
+\end{equation}
+
+\subsubsection{Input Matrix $\mathbf{B}$}
+
+\begin{equation}
+    \mathbf{B} = \begin{bmatrix}
+        0 \\[0.5ex]
+        \dfrac{I}{D_0} \\[2ex]
+        0 \\[0.5ex]
+        -\dfrac{m\ell}{D_0}
+    \end{bmatrix}
+\end{equation}
+
+Numerically:
+\begin{equation}
+    \mathbf{B} \approx \begin{bmatrix}
+        0 \\
+        0.759 \\
+        0 \\
+        -0.995
+    \end{bmatrix}
+\end{equation}
+
+\subsubsection{Output Matrix $\mathbf{C}$}
+
+For full state measurement:
+\begin{equation}
+    \mathbf{C} = \begin{bmatrix}
+        1 & 0 & 0 & 0 \\
+        0 & 1 & 0 & 0 \\
+        0 & 0 & 1 & 0 \\
+        0 & 0 & 0 & 1
+    \end{bmatrix} = \mathbf{I}_4
+\end{equation}
+
+For position and angle measurement only:
+\begin{equation}
+    \mathbf{C} = \begin{bmatrix}
+        1 & 0 & 0 & 0 \\
+        0 & 0 & 1 & 0
+    \end{bmatrix}
+\end{equation}
+
+\subsubsection{Feedthrough Matrix $\mathbf{D}$}
+
+There is no direct feedthrough from input to output:
+\begin{equation}
+    \mathbf{D} = \mathbf{0}
+\end{equation}
+
+%=============================================================================
+\section{Derivation of A and B Matrix Elements}
+%=============================================================================
+
+Starting from the linearised equations:
+\begin{align}
+    M_t\ddot{x} + m\ell\ddot{\theta} &= F - b_x\dot{x} \label{eq:lin1}\\
+    m\ell\ddot{x} + I\ddot{\theta} &= mg\ell\theta - b_\theta\dot{\theta} \label{eq:lin2}
+\end{align}
+
+Solving Equation~\eqref{eq:lin1} for $\ddot{x}$:
+\begin{equation}
+    \ddot{x} = \frac{F - b_x\dot{x} - m\ell\ddot{\theta}}{M_t}
+\end{equation}
+
+Substituting into Equation~\eqref{eq:lin2}:
+\begin{equation}
+    \frac{m\ell(F - b_x\dot{x} - m\ell\ddot{\theta})}{M_t} + I\ddot{\theta} = mg\ell\theta - b_\theta\dot{\theta}
+\end{equation}
+
+Collecting $\ddot{\theta}$ terms:
+\begin{equation}
+    \ddot{\theta}\left(I - \frac{(m\ell)^2}{M_t}\right) = mg\ell\theta - b_\theta\dot{\theta} - \frac{m\ell(F - b_x\dot{x})}{M_t}
+\end{equation}
+
+The coefficient of $\ddot{\theta}$ simplifies:
+\begin{equation}
+    I - \frac{(m\ell)^2}{M_t} = \frac{M_t I - (m\ell)^2}{M_t} = \frac{D_0}{M_t}
+\end{equation}
+
+Therefore:
+\begin{equation}
+    \ddot{\theta} = \frac{M_t}{D_0}\left[mg\ell\theta - b_\theta\dot{\theta} - \frac{m\ell}{M_t}(F - b_x\dot{x})\right]
+\end{equation}
+
+Expanding:
+\begin{equation}
+    \ddot{\theta} = \frac{M_t mg\ell}{D_0}\theta - \frac{M_t b_\theta}{D_0}\dot{\theta} - \frac{m\ell}{D_0}F + \frac{m\ell b_x}{D_0}\dot{x}
+\end{equation}
+
+Similarly for $\ddot{x}$:
+\begin{equation}
+    \ddot{x} = -\frac{Ib_x}{D_0}\dot{x} - \frac{(m\ell)^2 g}{D_0}\theta + \frac{m\ell b_\theta}{D_0}\dot{\theta} + \frac{I}{D_0}F
+\end{equation}
+
+Writing in state-space form with $\mathbf{x} = [x, \dot{x}, \theta, \dot{\theta}]^T$:
+\begin{equation}
+    \begin{bmatrix} \dot{x} \\ \ddot{x} \\ \dot{\theta} \\ \ddot{\theta} \end{bmatrix}
+    =
+    \begin{bmatrix}
+        0 & 1 & 0 & 0 \\
+        0 & -\dfrac{Ib_x}{D_0} & -\dfrac{(m\ell)^2 g}{D_0} & \dfrac{m\ell b_\theta}{D_0} \\
+        0 & 0 & 0 & 1 \\
+        0 & \dfrac{m\ell b_x}{D_0} & \dfrac{M_t m\ell g}{D_0} & -\dfrac{M_t b_\theta}{D_0}
+    \end{bmatrix}
+    \begin{bmatrix} x \\ \dot{x} \\ \theta \\ \dot{\theta} \end{bmatrix}
+    +
+    \begin{bmatrix}
+        0 \\ \dfrac{I}{D_0} \\ 0 \\ -\dfrac{m\ell}{D_0}
+    \end{bmatrix}
+    F
+\end{equation}
+
+%=============================================================================
+\section{System Properties}
+%=============================================================================
+
+\subsection{Controllability}
+
+The system is \textbf{controllable} if the controllability matrix has full rank:
+\begin{equation}
+    \mathcal{C} = \begin{bmatrix} \mathbf{B} & \mathbf{AB} & \mathbf{A}^2\mathbf{B} & \mathbf{A}^3\mathbf{B} \end{bmatrix}
+\end{equation}
+
+For this system:
+\begin{equation}
+    \text{rank}(\mathcal{C}) = 4 = n
+\end{equation}
+
+The system is \textbf{fully controllable}, meaning any state can be reached from any other state using the control input $F$.
+
+\subsection{Eigenvalues (Open-Loop Poles)}
+
+The eigenvalues of $\mathbf{A}$ determine open-loop stability. For the upright equilibrium:
+\begin{itemize}
+    \item One positive real eigenvalue $\Rightarrow$ \textbf{unstable} (pendulum falls)
+    \item One negative real eigenvalue
+    \item Two zero or near-zero eigenvalues (cart motion)
+\end{itemize}
+
+The presence of a positive eigenvalue confirms that the upright position is an \textbf{unstable equilibrium} requiring active control.
+
+\subsection{Observability}
+
+With measurements $y = [x, \theta]^T$, the observability matrix:
+\begin{equation}
+    \mathcal{O} = \begin{bmatrix} \mathbf{C} \\ \mathbf{CA} \\ \mathbf{CA}^2 \\ \mathbf{CA}^3 \end{bmatrix}
+\end{equation}
+
+has $\text{rank}(\mathcal{O}) = 4$, confirming the system is \textbf{fully observable}.
+
+%=============================================================================
+\section{Physical Interpretation of Matrix Elements}
+%=============================================================================
+
+\subsection{A Matrix Elements}
+
+\begin{itemize}
+    \item $A_{21} = -\dfrac{Ib_x}{D_0}$: Cart friction decelerates cart motion
+    \item $A_{23} = -\dfrac{(m\ell)^2 g}{D_0}$: Gravity acting through pendulum coupling affects cart (note: negative because of reaction force direction)
+    \item $A_{24} = \dfrac{m\ell b_\theta}{D_0}$: Pivot friction affects cart through coupling
+    \item $A_{42} = \dfrac{m\ell b_x}{D_0}$: Cart friction affects pendulum through coupling
+    \item $A_{43} = \dfrac{M_t m\ell g}{D_0}$: Gravitational restoring torque (positive $\Rightarrow$ unstable for inverted pendulum)
+    \item $A_{44} = -\dfrac{M_t b_\theta}{D_0}$: Pivot friction damps pendulum motion
+\end{itemize}
+
+\subsection{B Matrix Elements}
+
+\begin{itemize}
+    \item $B_2 = \dfrac{I}{D_0}$: Force accelerates cart (positive)
+    \item $B_4 = -\dfrac{m\ell}{D_0}$: Force causes pendulum angular acceleration (negative because pushing cart right causes pendulum to tip left relative to cart)
+\end{itemize}
+
+%=============================================================================
+\section{Summary}
+%=============================================================================
+
+The inverted cart-pendulum system is described by the state-space model:
+\begin{equation}
+    \boxed{
+    \begin{aligned}
+        \dot{\mathbf{x}} &= \mathbf{A}\mathbf{x} + \mathbf{B}u \\[1ex]
+        \mathbf{x} &= \begin{bmatrix} x \\ \dot{x} \\ \theta \\ \dot{\theta} \end{bmatrix}, \quad
+        u = F
+    \end{aligned}
+    }
+\end{equation}
+
+where:
+\begin{equation}
+    \boxed{
+    \mathbf{A} = \begin{bmatrix}
+        0 & 1 & 0 & 0 \\[0.5ex]
+        0 & -\dfrac{Ib_x}{D_0} & -\dfrac{(m\ell)^2 g}{D_0} & \dfrac{m\ell b_\theta}{D_0} \\[2ex]
+        0 & 0 & 0 & 1 \\[0.5ex]
+        0 & \dfrac{m\ell b_x}{D_0} & \dfrac{M_t m\ell g}{D_0} & -\dfrac{M_t b_\theta}{D_0}
+    \end{bmatrix}
+    , \quad
+    \mathbf{B} = \begin{bmatrix}
+        0 \\[0.5ex]
+        \dfrac{I}{D_0} \\[2ex]
+        0 \\[0.5ex]
+        -\dfrac{m\ell}{D_0}
+    \end{bmatrix}
+    }
+\end{equation}
+
+with:
+\begin{equation}
+    \boxed{D_0 = M_t I - (m\ell)^2}
+\end{equation}
+
+\end{document}
