@@ -3,8 +3,8 @@
 
 #include <Arduino.h>
 
-#define encoder_front_left_encoder_A 2
-#define encoder_front_left_encoder_B 3
+#define encoder_front_left_encoder_A 14
+#define encoder_front_left_encoder_B 15
 
 #define encoder_front_right_encoder_A 5
 #define encoder_front_right_encoder_B 6

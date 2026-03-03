@@ -12,6 +12,7 @@ LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
 
 float pendulum_encoder_angle = 0.0;
 const float pendulum_pulses_per_revolution = 1000;
+#define CALIBRATION_OFFSET_DEG (-11.879f)
 
 unsigned long t0 = 0;
 unsigned long t1 = 0;
@@ -58,6 +59,7 @@ void loop() {
   } else if (pendulum_encoder_angle < 0.0) {
     pendulum_encoder_angle += 360.0;
   }
+  pendulum_encoder_angle += CALIBRATION_OFFSET_DEG;
 
   // Calculate time delta
   unsigned long current_time = millis();
@@ -103,6 +105,7 @@ void loop() {
 
   // Debug output (throttled, same 100 ms as above)
   if (do_print) {
+    Serial.println("Pendulum Angle: " + String(pendulum_encoder_angle));
     Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
     Serial.println("---");
   }
