@@ -102,19 +102,23 @@ void loop() {
   // ==================== NEED TO ADD LQR HERE ====================
   // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
 
+  Serial.println("Calculating PIDs");
+
   // Compute PID output for each motor
-  // int16_t pid_front_left = compute_pid_front_left(desired_speed, actual_speed_front_left, dt);
-  // int16_t pid_front_right = compute_pid_front_right(desired_speed, actual_speed_front_right, dt);
-  // int16_t pid_back_left = compute_pid_back_left(desired_speed, actual_speed_back_left, dt);
-  // int16_t pid_back_right = compute_pid_back_right(desired_speed, actual_speed_back_right, dt);
+  int16_t pid_front_left = compute_pid_front_left(desired_speed, actual_speed_front_left, dt);
+  int16_t pid_front_right = compute_pid_front_right(desired_speed, actual_speed_front_right, dt);
+  int16_t pid_back_left = compute_pid_back_left(desired_speed, actual_speed_back_left, dt);
+  int16_t pid_back_right = compute_pid_back_right(desired_speed, actual_speed_back_right, dt);
+
+  Serial.println("Calculating Motor Speeds");
 
   // Apply PID outputs to motors
-  // set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+  set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
 
   // Debug output (throttled, same 100 ms as above)
   if (do_print) {
     Serial.println("Pendulum Angle: " + String(pendulum_encoder_angle));
-    // Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
+    Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
     Serial.println("---");
   }
 }
