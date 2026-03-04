@@ -36,39 +36,30 @@ void motor_encoder_setup() {
         last_state_A[i] = digitalRead(encoder_pin_A[i]);
         last_state_B[i] = digitalRead(encoder_pin_B[i]);
 
-        // Arduino Giga R1 (STM32H747): attach interrupts only for pins that work.
-        // Encoder 0 (pins 2,3) enabled; encoders 1–3 (pins 5,6,8,9,11,12) commented out.
-        // Uncomment the blocks below for each encoder when those pins are verified.
-#if 1
         if (i == 0) {
-            // Encoder 0: front left — pins 2, 3
             int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
             int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
             if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
             if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
         }
-        // Encoder 1: front right — pins 5, 6 (comment out when not in use)
-        // else if (i == 1) {
-        //     int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
-        //     int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
-        //     if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
-        //     if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
-        // }
-        // Encoder 2: back left — pins 8, 9
-        // else if (i == 2) {
-        //     int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
-        //     int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
-        //     if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
-        //     if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
-        // }
-        // Encoder 3: back right — pins 11, 12
-        // else if (i == 3) {
-        //     int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
-        //     int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
-        //     if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
-        //     if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
-        // }
-#endif
+        else if (i == 1) {
+            int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
+            int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
+            if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
+            if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
+        }
+        else if (i == 2) {
+            int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
+            int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
+            if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
+            if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
+        }
+        else if (i == 3) {
+            int irqA = digitalPinToInterrupt(encoder_pin_A[i]);
+            int irqB = digitalPinToInterrupt(encoder_pin_B[i]);
+            if (irqA >= 0) attachInterrupt(irqA, isr_table[i], CHANGE);
+            if (irqB >= 0) attachInterrupt(irqB, isr_table[i], CHANGE);
+        }
 
         last_speed_update_time[i] = millis();
     }
