@@ -5,7 +5,7 @@
 
 #define encoderA 8
 #define encoderB 9
-#define encoderI 10
+#define encoderI 7
 
 extern volatile long pendulum_encoder_pulse_count; 
 

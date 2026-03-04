@@ -38,7 +38,7 @@ void setup() {
   Serial.println("Pendulum Encoder initialisation complete.");
 
   Serial.println("Initialising Motor Encoders...");
-  //motor_encoder_setup();
+  motor_encoder_setup();
   Serial.println("Motor Encoder initialisation complete.");
 
   Serial.println("Setup complete. Entering loop.");
