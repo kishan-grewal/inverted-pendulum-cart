@@ -1,14 +1,14 @@
 import numpy as np
 
 # Physical parameters
-M = 0.828  # cart mass [kg]
-m_rod = 0.0225  # rod mass [kg]
+M_TOTAL = 1.515  # total system mass [kg]
+m_rod = 0.043  # rod mass [kg]
 m_tip = 0.050  # tip mass [kg]
 m_pend = m_rod + m_tip
+M = M_TOTAL - m_pend  # cart mass [kg]
 L_rod = 0.6  # rod length [m]
 l = (m_rod * L_rod / 2 + m_tip * L_rod) / m_pend  # CoM from pivot
-I_rod_com = (1 / 12) * m_rod * L_rod ** 2
-I_pivot = I_rod_com + m_rod * (L_rod / 2) ** 2 + m_tip * L_rod ** 2
+I_pivot = (1/3) * m_rod * L_rod ** 2 + m_tip * L_rod ** 2
 b_x = 0.1  # cart friction [N·s/m]
 b_theta = 0.001  # pivot friction [N·m·s/rad]
 c_drag = 0.002  # air drag coefficient
