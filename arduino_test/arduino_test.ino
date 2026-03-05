@@ -130,7 +130,8 @@ void loop() {
   int16_t pid_back_right = compute_pid_back_right(desired_speed, speeds[3], dt);
 
   // Apply PID outputs to motors
-  set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+  // set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+  set_motor_speeds(pid_front_left, 0, 0, 0);  // TEST: Only control front left motor for now
 
   // Debug output (throttled, same 100 ms as above)
   if (do_print) {
