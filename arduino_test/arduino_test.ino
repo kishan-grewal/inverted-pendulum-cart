@@ -21,7 +21,10 @@ float dt = 0.0;
 
 unsigned long last_loop_time = 0;
 
-const float desired_speed = 0.2; // m/s
+// Inverted saw: desired speed spikes to max, ramps down to min over period, then resets
+const float SAW_PERIOD_SEC = 2.0f;
+const float SAW_MIN_SPEED = -0.5f;   // m/s
+const float SAW_MAX_SPEED = 0.5f;   // m/s (spike)
 
 void setup() {
   Serial.begin(115200);
@@ -123,15 +126,43 @@ void loop() {
   // ==================== NEED TO ADD LQR HERE ====================
   // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
 
+  // Desired speed: inverted saw (spike to max, ramp down to min over period, then reset)
+  float phase = fmodf(current_time / 1000.0f, SAW_PERIOD_SEC) / SAW_PERIOD_SEC;
+  float desired_speed = SAW_MAX_SPEED - phase * (SAW_MAX_SPEED - SAW_MIN_SPEED);
+
   // Compute PID output for each motor
   int16_t pid_front_left = compute_pid_front_left(desired_speed, speeds[0], dt);
   int16_t pid_front_right = compute_pid_front_right(desired_speed, speeds[1], dt);
   int16_t pid_back_left = compute_pid_back_left(desired_speed, speeds[2], dt);
   int16_t pid_back_right = compute_pid_back_right(desired_speed, speeds[3], dt);
 
+  if (pid_front_left > 5) {
+    pid_front_left = pid_front_left + 40;
+  } else if (pid_front_left < -5) {
+    pid_front_left = pid_front_left - 40;
+  }
+
+  if (pid_front_right > 5) {
+    pid_front_right = pid_front_right + 40;
+  } else if (pid_front_right < -5) {
+    pid_front_right = pid_front_right - 40;
+  }
+
+  if (pid_back_left > 5) {
+    pid_back_left = pid_back_left + 40;
+  } else if (pid_back_left < -5) {
+    pid_back_left = pid_back_left - 40;
+  }
+
+  if (pid_back_right > 5) {
+    pid_back_right = pid_back_right + 40;
+  } else if (pid_back_right < -5) {
+    pid_back_right = pid_back_right - 40;
+  }
+
   // Apply PID outputs to motors
-  // set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
-  set_motor_speeds(pid_front_left, 0, 0, 0);  // TEST: Only control front left motor for now
+  set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);
+  // set_motor_speeds(pid_front_left, 0, 0, 0);  // TEST: Only control front left motor for now
 
   // Debug output (throttled, same 100 ms as above)
   // if (do_print) {
@@ -142,7 +173,7 @@ void loop() {
 
   // for teleplot extension plots
   if (do_print) {
-    Serial.println(">desired:0.2");
+    Serial.println(">desired:" + String(desired_speed, 3));
     Serial.println(">actual:" + String(speeds[0], 3));
     Serial.println(">pwm:" + String((float)pid_front_left / 1000.0, 3));
   }
