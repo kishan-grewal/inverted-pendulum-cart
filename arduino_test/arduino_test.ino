@@ -109,10 +109,10 @@ void loop() {
   // Throttle serial to avoid buffer overflow / watchdog; print every ~100 ms
   static unsigned long last_print = 0;
   bool do_print = (current_time - last_print >= 100);
-  if (do_print) {
-    last_print = current_time;
-    Serial.println("Encoder Speed (m/s) [FL, FR, BL, BR]: " + String(speeds[0], 3) + ", " + String(speeds[1], 3) + ", " + String(speeds[2], 3) + ", " + String(speeds[3], 3));
-  }
+  // if (do_print) {
+  //   last_print = current_time;
+  //   Serial.println("Encoder Speed (m/s) [FL, FR, BL, BR]: " + String(speeds[0], 3) + ", " + String(speeds[1], 3) + ", " + String(speeds[2], 3) + ", " + String(speeds[3], 3));
+  // }
 
   // Kalman filter to estimate cart position and velocity
   // float z[4] = {speeds[0], speeds[1], speeds[2], speeds[3]};
@@ -134,9 +134,16 @@ void loop() {
   set_motor_speeds(pid_front_left, 0, 0, 0);  // TEST: Only control front left motor for now
 
   // Debug output (throttled, same 100 ms as above)
+  // if (do_print) {
+  //   Serial.println("Pendulum Angle: " + String(pendulum_encoder_angle));
+  //   Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
+  //   Serial.println("---");
+  // }
+
+  // for teleplot extension plots
   if (do_print) {
-    Serial.println("Pendulum Angle: " + String(pendulum_encoder_angle));
-    Serial.println("Motor PID [FL, FR, BL, BR]: " + String(pid_front_left) + ", " + String(pid_front_right) + ", " + String(pid_back_left) + ", " + String(pid_back_right));
-    Serial.println("---");
+    Serial.println(">desired:0.2");
+    Serial.println(">actual:" + String(speeds[0], 3));
+    Serial.println(">pwm:" + String((float)pid_front_left / 1000.0, 3));
   }
 }
