@@ -10,20 +10,20 @@ void motors_init()
   motor_driver_back.clearResetFlag();
 
   // left motor
-  motor_driver_front.setMaxAcceleration(1, 800);
-  motor_driver_front.setMaxDeceleration(1, 800);
+  motor_driver_front.setMaxAcceleration(1, 400);
+  motor_driver_front.setMaxDeceleration(1, 400);
   // right motor
-  motor_driver_front.setMaxAcceleration(2, 800);
-  motor_driver_front.setMaxDeceleration(2, 800);
+  motor_driver_front.setMaxAcceleration(2, 400);
+  motor_driver_front.setMaxDeceleration(2, 400);
 
   motor_driver_front.clearMotorFaultUnconditional();
 
   // left motor
-  motor_driver_back.setMaxAcceleration(1, 800);
-  motor_driver_back.setMaxDeceleration(1, 800);
+  motor_driver_back.setMaxAcceleration(1, 400);
+  motor_driver_back.setMaxDeceleration(1, 400);
   // right motor
-  motor_driver_back.setMaxAcceleration(2, 800);
-  motor_driver_back.setMaxDeceleration(2, 800);
+  motor_driver_back.setMaxAcceleration(2, 400);
+  motor_driver_back.setMaxDeceleration(2, 400);
 
   motor_driver_back.clearMotorFaultUnconditional();
 }

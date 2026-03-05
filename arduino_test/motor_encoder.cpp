@@ -63,7 +63,7 @@ void encoders_getDistance(float *d1, float *d2, float *d3, float *d4){
 
   // clockwise spin is positive count
   noInterrupts();
-  long c1 = -ME1.count, c2 = ME2.count, c3 = -ME3.count, c4 = ME4.count;
+  long c1 = ME1.count, c2 = ME2.count, c3 = ME3.count, c4 = ME4.count;
   interrupts();
 
   if(d1) *d1 = c1 * DIST_PER_COUNT;

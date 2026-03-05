@@ -21,7 +21,7 @@ float dt = 0.0;
 
 unsigned long last_loop_time = 0;
 
-const float desired_speed = 1.0; // m/s
+const float desired_speed = 0.2; // m/s
 
 void setup() {
   Serial.begin(115200);
@@ -83,16 +83,39 @@ void loop() {
   float d1, d2, d3, d4;
   encoders_getDistance(&d1, &d2, &d3, &d4);
 
+  // Differentiate to get speed
+  static float prev_d[4] = {0, 0, 0, 0};
+  float dists[4] = {d1, d2, d3, d4};
+  float speeds[4];
+
+  #define AVG_SIZE 10
+  static float speed_buf[4][AVG_SIZE] = {};
+  static int buf_idx = 0;
+
+  for (int i = 0; i < 4; i++) {
+    float raw = 0.0f;
+    if (dt > 0.001f) {
+      raw = (dists[i] - prev_d[i]) / dt;
+    }
+    prev_d[i] = dists[i];
+    speed_buf[i][buf_idx] = raw;
+
+    float sum = 0.0f;
+    for (int j = 0; j < AVG_SIZE; j++) sum += speed_buf[i][j];
+    speeds[i] = sum / AVG_SIZE;
+  }
+  buf_idx = (buf_idx + 1) % AVG_SIZE;
+
   // Throttle serial to avoid buffer overflow / watchdog; print every ~100 ms
   static unsigned long last_print = 0;
   bool do_print = (current_time - last_print >= 100);
   if (do_print) {
     last_print = current_time;
-    Serial.println("Encoder Distance (m) [FL, FR, BL, BR]: " + String(d1, 4) + ", " + String(d2, 4) + ", " + String(d3, 4) + ", " + String(d4, 4));
+    Serial.println("Encoder Speed (m/s) [FL, FR, BL, BR]: " + String(speeds[0], 3) + ", " + String(speeds[1], 3) + ", " + String(speeds[2], 3) + ", " + String(speeds[3], 3));
   }
 
   // Kalman filter to estimate cart position and velocity
-  // float z[4] = {actual_speed_front_left, actual_speed_front_right, actual_speed_back_left, actual_speed_back_right};
+  // float z[4] = {speeds[0], speeds[1], speeds[2], speeds[3]};
   // kalman.update(z, 4, dt);
   // float estimated_position = kalman.getPosition();
   // float estimated_velocity = kalman.getVelocity();
@@ -101,10 +124,10 @@ void loop() {
   // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
 
   // Compute PID output for each motor
-  int16_t pid_front_left = compute_pid_front_left(desired_speed, 0, dt);
-  int16_t pid_front_right = compute_pid_front_right(desired_speed, 0, dt);
-  int16_t pid_back_left = compute_pid_back_left(desired_speed, 0, dt);
-  int16_t pid_back_right = compute_pid_back_right(desired_speed, 0, dt);
+  int16_t pid_front_left = compute_pid_front_left(desired_speed, speeds[0], dt);
+  int16_t pid_front_right = compute_pid_front_right(desired_speed, speeds[1], dt);
+  int16_t pid_back_left = compute_pid_back_left(desired_speed, speeds[2], dt);
+  int16_t pid_back_right = compute_pid_back_right(desired_speed, speeds[3], dt);
 
   // Apply PID outputs to motors
   set_motor_speeds(pid_front_left, pid_front_right, pid_back_left, pid_back_right);

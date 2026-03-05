@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define MOTOR_KP 400.0
+#define MOTOR_KP 1200.0
 #define MOTOR_KI 0.0
 #define MOTOR_KD 0.0
 #define INTEGRAL_LIMIT 0.0
