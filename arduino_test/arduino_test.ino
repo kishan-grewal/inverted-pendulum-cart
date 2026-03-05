@@ -117,18 +117,22 @@ void loop() {
   //   Serial.println("Encoder Speed (m/s) [FL, FR, BL, BR]: " + String(speeds[0], 3) + ", " + String(speeds[1], 3) + ", " + String(speeds[2], 3) + ", " + String(speeds[3], 3));
   // }
 
-  // Kalman filter to estimate cart position and velocity
-  // float z[4] = {speeds[0], speeds[1], speeds[2], speeds[3]};
-  // kalman.update(z, 4, dt);
-  // float estimated_position = kalman.getPosition();
-  // float estimated_velocity = kalman.getVelocity();
+  // Kalman filter: estimate state [x, v, theta, theta_dot] from cart positions and pendulum angle
+  // z_cart = wheel encoder positions [m], z_theta = pendulum angle [rad], u = control force [N]
+  float z_cart[4] = {d1, d2, d3, d4};
+  float theta_rad = pendulum_encoder_angle * (3.14159265f / 180.0f);
+  float u = 0.0f;  // no force feedback into Kalman for now (or use previous LQR output if available)
+  kalman.update(u, z_cart, 4, theta_rad, dt);
 
-  // ==================== NEED TO ADD LQR HERE ====================
-  // use estimated position, velocity, pendulum angle, pendulum angular velocity to compute control output
+  float estimated_position = kalman.getPosition();
+  float estimated_velocity = kalman.getVelocity();
 
-  // Desired speed: inverted saw (spike to max, ramp down to min over period, then reset)
-  float phase = fmodf(current_time / 1000.0f, SAW_PERIOD_SEC) / SAW_PERIOD_SEC;
-  float desired_speed = SAW_MAX_SPEED - phase * (SAW_MAX_SPEED - SAW_MIN_SPEED);
+  // Saw wave as input: ramp from SAW_MAX_SPEED down to SAW_MIN_SPEED over SAW_PERIOD_SEC, then repeat
+  float t_sec = current_time / 1000.0f;
+  float phase = fmodf(t_sec, SAW_PERIOD_SEC);
+  float desired_speed = SAW_MAX_SPEED + (SAW_MIN_SPEED - SAW_MAX_SPEED) * (phase / SAW_PERIOD_SEC);
+
+  // PID tracks desired_speed (saw); Kalman estimates cart velocity for plotting
 
   // Compute PID output for each motor
   int16_t pid_front_left = compute_pid_front_left(desired_speed, speeds[0], dt);
@@ -171,10 +175,12 @@ void loop() {
   //   Serial.println("---");
   // }
 
-  // for teleplot extension plots
+  // for plotting
   if (do_print) {
+    last_print = current_time;
     Serial.println(">desired:" + String(desired_speed, 3));
     Serial.println(">actual:" + String(speeds[0], 3));
+    Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
     Serial.println(">pwm:" + String((float)pid_front_left / 1000.0, 3));
   }
 }

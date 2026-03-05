@@ -17,9 +17,10 @@ class LocalisationKalman {
     };
 
     // Physical parameters (from dynamics.py)
-    static constexpr float M_cart  = 0.828f;
-    static constexpr float m_rod   = 0.0225f;
+    static constexpr float M_cart_total  = 1.515f;
+    static constexpr float m_rod   = 0.043f;
     static constexpr float m_tip   = 0.050f;
+    static constexpr float M_cart  = M_cart_total - m_rod - m_tip; //0.828
     static constexpr float m_pend  = m_rod + m_tip;
     static constexpr float L_rod   = 0.6f;
     static constexpr float l_com   = (m_rod * L_rod / 2.0f + m_tip * L_rod) / m_pend;
