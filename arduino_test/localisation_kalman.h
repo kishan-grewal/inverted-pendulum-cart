@@ -28,7 +28,7 @@ class LocalisationKalman {
                                    + m_rod*(L_rod/2.0f)*(L_rod/2.0f)
                                    + m_tip*L_rod*L_rod;
     static constexpr float b_x     = 0.1f;
-    static constexpr float b_theta = 0.001f;
+    static constexpr float b_theta = 0.004320f;
     static constexpr float g       = 9.81f;
     static constexpr float M_t     = M_cart + m_pend;
     static constexpr float ml      = m_pend * l_com;
@@ -46,8 +46,9 @@ class LocalisationKalman {
     static constexpr float B2  =  I_pivot / D_denom;
     static constexpr float B4  = -ml      / D_denom;
 
-    // Process noise (diagonal)
-    float Q[4] = {0.001f, 0.01f, 0.0001f, 0.01f};
+    // Process noise (diagonal): [x, v, theta, theta_v]
+    // Increase Q[1] so velocity estimate tracks actual better (less sluggish, less attenuation)
+    float Q[4] = {0.001f, 0.5f, 0.0001f, 0.01f};
 
     // Measurement noise
     float R_cart     = 0.05f;   // per wheel encoder [m]

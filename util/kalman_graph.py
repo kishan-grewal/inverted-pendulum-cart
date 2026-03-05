@@ -59,7 +59,7 @@ def setup_plot(window_sec):
     # ax_right = ax_left.twinx()
 
     line_desired, = ax_left.plot([], [], color="C0", linestyle="-", linewidth=0.75, label="Desired (m/s)", zorder=4)
-    line_actual, = ax_left.plot([], [], color="C1", linestyle="-", linewidth=0.75, label="Actual (m/s)", zorder=3)
+    line_actual, = ax_left.plot([], [], color="green", linestyle="-", linewidth=0.75, label="Actual (m/s)", zorder=3)
     line_estimated_velocity, = ax_left.plot([], [], color="C3", linestyle="-", linewidth=0.75, label="Kalman est. velocity (m/s)", zorder=2)
     # line_pwm, = ax_right.plot([], [], color="C2", linestyle="-", linewidth=0.75, label="PWM", zorder=1)
     line_pwm = None  # PWM plot commented out
