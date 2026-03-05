@@ -53,6 +53,7 @@ class LocalisationKalman {
     // Measurement noise
     float R_cart     = 0.05f;   // per wheel encoder [m]
     float R_pendulum = 0.005f;  // pendulum encoder [rad]
+    float R_velocity = 0.15f;   // encoder-derived velocity [m/s] (reduces bias when cart at rest)
 
     // Sequential scalar Kalman update for state at index h_idx
     void scalarUpdate(int h_idx, float innov, float R_eff) {
@@ -76,7 +77,8 @@ class LocalisationKalman {
     // num_cart: number of wheel encoders (4)
     // z_theta:  pendulum angle [rad], 0 = upright
     // dt:       time step [s]
-    void update(float u, float z_cart[], int num_cart, float z_theta, float dt) {
+    // z_velocity: encoder-derived cart velocity [m/s] (e.g. average of wheel speeds) – reduces velocity bias when cart at rest
+    void update(float u, float z_cart[], int num_cart, float z_theta, float dt, float z_velocity) {
 
       // 1. PREDICT: x_new = x + A*x*dt + B*u*dt  (Euler, linearised about upright)
       float dx       =  v * dt;
@@ -113,6 +115,9 @@ class LocalisationKalman {
 
       // 3. UPDATE: pendulum angle (H = [0,0,1,0])
       scalarUpdate(2, z_theta - theta, R_pendulum);
+
+      // 4. UPDATE: velocity (H = [0,1,0,0]) – pulls estimate toward encoder speed, removes bias when cart at rest
+      scalarUpdate(1, z_velocity - v, R_velocity);
     }
 
     float getPosition()      { return x; }

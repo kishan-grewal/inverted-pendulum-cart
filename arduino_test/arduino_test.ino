@@ -8,7 +8,8 @@
 #include "localisation_kalman.h"
 
 LocalisationKalman kalman;
-LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
+// LQR gains from python/lqr_gains.py (force output F = -K*x; accel = F/M_TOTAL)
+LQRController lqr(-99.081f, -103.15984f, -496.930798f, -97.132137f);
 
 float pendulum_encoder_angle = 0.0;
 const float pendulum_pulses_per_revolution = 1000;
@@ -21,10 +22,9 @@ float dt = 0.0;
 
 unsigned long last_loop_time = 0;
 
-// Inverted saw: desired speed spikes to max, ramps down to min over period, then resets
-const float SAW_PERIOD_SEC = 2.0f;
-const float SAW_MIN_SPEED = -0.5f;   // m/s
-const float SAW_MAX_SPEED = 0.5f;   // m/s (spike)
+// LQR: integrate acceleration to get velocity setpoint; clamp to this range
+const float LQR_VELOCITY_MAX = 0.5f;   // m/s
+const float LQR_VELOCITY_MIN = -0.5f;  // m/s
 
 void setup() {
   Serial.begin(115200);
@@ -43,6 +43,9 @@ void setup() {
   Serial.println("Initialising Motor Encoders...");
   motorEncoders_init();
   Serial.println("Motor Encoder initialisation complete.");
+
+  // LQR output is force [N]; limit to avoid excessive acceleration
+  lqr.setOutputLimits(-10.0f, 10.0f);
 
   Serial.println("Setup complete. Entering loop.");
   Serial.flush();
@@ -117,22 +120,38 @@ void loop() {
   //   Serial.println("Encoder Speed (m/s) [FL, FR, BL, BR]: " + String(speeds[0], 3) + ", " + String(speeds[1], 3) + ", " + String(speeds[2], 3) + ", " + String(speeds[3], 3));
   // }
 
-  // Kalman filter: estimate state [x, v, theta, theta_dot] from cart positions and pendulum angle
-  // z_cart = wheel encoder positions [m], z_theta = pendulum angle [rad], u = control force [N]
+  // Kalman filter: estimate state [x, v, theta, theta_dot]; velocity update reduces bias when cart at rest
   float z_cart[4] = {d1, d2, d3, d4};
   float theta_rad = pendulum_encoder_angle * (3.14159265f / 180.0f);
-  float u = 0.0f;  // no force feedback into Kalman for now (or use previous LQR output if available)
-  kalman.update(u, z_cart, 4, theta_rad, dt);
+  float z_velocity = (speeds[0] + speeds[1] + speeds[2] + speeds[3]) / 4.0f;  // avg encoder speed [m/s]
+  static float u_prev = 0.0f;  // previous LQR force for Kalman prediction
+  kalman.update(u_prev, z_cart, 4, theta_rad, dt, z_velocity);
 
   float estimated_position = kalman.getPosition();
   float estimated_velocity = kalman.getVelocity();
 
-  // Saw wave as input: ramp from SAW_MAX_SPEED down to SAW_MIN_SPEED over SAW_PERIOD_SEC, then repeat
-  float t_sec = current_time / 1000.0f;
-  float phase = fmodf(t_sec, SAW_PERIOD_SEC);
-  float desired_speed = SAW_MAX_SPEED + (SAW_MIN_SPEED - SAW_MAX_SPEED) * (phase / SAW_PERIOD_SEC);
+  // LQR state: [x, x_dot, theta, theta_dot] from Kalman (theta from encoder fused in Kalman)
+  float state[4] = {
+    estimated_position,
+    estimated_velocity,
+    kalman.getTheta(),
+    kalman.getThetaVelocity()
+  };
+  float target[4] = {0.0f, 0.0f, 0.0f, 0.0f};  // upright at rest
 
-  // PID tracks desired_speed (saw); Kalman estimates cart velocity for plotting
+  // LQR outputs force [N]; convert to acceleration and integrate for velocity setpoint
+  const float M_TOTAL = 1.515f;
+  float lqr_force = lqr.compute(state, target);
+  float lqr_accel = lqr_force / M_TOTAL;
+  static float v_target = 0.0f;
+  v_target += lqr_accel * dt;
+  if (v_target > LQR_VELOCITY_MAX) v_target = LQR_VELOCITY_MAX;
+  if (v_target < LQR_VELOCITY_MIN) v_target = LQR_VELOCITY_MIN;
+
+  float desired_speed = v_target;
+
+  // Force for next Kalman prediction [N]
+  u_prev = lqr_force;
 
   // Compute PID output for each motor
   int16_t pid_front_left = compute_pid_front_left(desired_speed, speeds[0], dt);
@@ -175,12 +194,13 @@ void loop() {
   //   Serial.println("---");
   // }
 
-  // for plotting
+  // for plotting (kalman_graph, lqr_graph)
   if (do_print) {
     last_print = current_time;
     Serial.println(">desired:" + String(desired_speed, 3));
     Serial.println(">actual:" + String(speeds[0], 3));
     Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
+    Serial.println(">pendulum_angle:" + String(pendulum_encoder_angle, 3));
     Serial.println(">pwm:" + String((float)pid_front_left / 1000.0, 3));
   }
 }
