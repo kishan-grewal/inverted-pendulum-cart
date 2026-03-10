@@ -197,6 +197,13 @@ void loop() {
   //   Serial.println("---");
   // }
 
+  // dt average finder
+  static float dt_sum = 0.0f;
+  static long dt_n = 0;
+  dt_sum += dt * 1000.0f;
+  dt_n++;
+  float dt_cumavg = dt_sum / dt_n;
+
   // for plotting (kalman_graph, lqr_graph)
   if (do_print) {
     last_print = current_time;
@@ -205,5 +212,7 @@ void loop() {
     Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
     Serial.println(">pendulum_angle:" + String(pendulum_encoder_angle, 3));
     Serial.println(">pwm:" + String((float)pid_front_left / 1000.0, 3));
+
+    Serial.println(">dt_cumavg_ms:" + String(dt_cumavg, 3));
   }
 }
