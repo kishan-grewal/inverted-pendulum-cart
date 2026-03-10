@@ -49,3 +49,14 @@ int16_t compute_pid_back_right(float desired_speed, float actual_speed, float dt
     float output = MOTOR_KP * error + MOTOR_KI * integral_back_right + MOTOR_KD * derivative;
     return (int16_t)constrain(output, -800, 800);
 }
+
+void reset_motor_pids() {
+    integral_front_left = 0;
+    integral_front_right = 0;
+    integral_back_left  = 0;
+    integral_back_right  = 0;
+    last_error_front_left = 0;
+    last_error_front_right = 0;
+    last_error_back_left  = 0;
+    last_error_back_right  = 0;
+}

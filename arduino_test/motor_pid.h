@@ -12,5 +12,6 @@ int16_t compute_pid_front_left(float desired_speed, float actual_speed, float dt
 int16_t compute_pid_front_right(float desired_speed, float actual_speed, float dt);
 int16_t compute_pid_back_left(float desired_speed, float actual_speed, float dt);
 int16_t compute_pid_back_right(float desired_speed, float actual_speed, float dt);
+void reset_motor_pids();
 
 #endif
