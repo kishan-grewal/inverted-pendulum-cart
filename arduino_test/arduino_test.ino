@@ -50,9 +50,9 @@ void setup() {
   Serial.println("Setup complete. Waiting for start button to be pressed...");
 
   while (digitalRead(START_BUTTON_PIN) == HIGH) {
-    double start_time = micros();
+    unsigned long start_time = micros();
 
-    while (digitalRead(CONTROL_SELECT_BUTTON_PIN) == HIGH) {
+    while (digitalRead(CONTROL_SELECT_BUTTON_PIN) == LOW) {
 
       // wait for 300ms button press before changing control mode
       if (micros() - start_time > 300000) {
@@ -78,7 +78,7 @@ void setup() {
             break;
         }
 
-        // exit loop to reset start time
+        // exit inner loop to reset start time
         break;
       }
     }
