@@ -23,8 +23,8 @@ float dt = 0.0;
 unsigned long last_loop_time = 0;
 
 // LQR: integrate acceleration to get velocity setpoint; clamp to this range
-const float LQR_VELOCITY_MAX = 0.5f;   // m/s
-const float LQR_VELOCITY_MIN = -0.5f;  // m/s
+const float LQR_VELOCITY_MAX = 2.0f;   // m/s
+const float LQR_VELOCITY_MIN = -2.0f;  // m/s
 
 void setup() {
   Serial.begin(115200);
