@@ -41,7 +41,7 @@ const float PENDULUM_X_INTEGRAL_LIMIT = 50.0f;
 CascadedPID cascaded_pid(PENDULUM_KP, PENDULUM_KI, PENDULUM_KD, PENDULUM_X_KP, PENDULUM_X_MAX, PENDULUM_X_INTEGRAL_LIMIT);
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(250000);
 
   Serial.flush();
   Serial.println("Setup starting...");
