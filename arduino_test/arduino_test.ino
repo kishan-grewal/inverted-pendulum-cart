@@ -76,9 +76,11 @@ void loop() {
     pendulum_encoder_angle += 360.0f;
   }
 
-  // Calculate time delta
+  // Calculate time delta MILLIS / MICROS
   unsigned long current_time = millis();
-  dt = (current_time - last_loop_time) / 1000.0;  // Convert to seconds
+  dt = (current_time - last_loop_time) / 1000.0;  // Milli to seconds
+  // unsigned long current_time = micros();
+  // dt = (current_time - last_loop_time) / 1000000.0f;  // Micro to seconds
   last_loop_time = current_time;
 
   // Protect against first iteration
