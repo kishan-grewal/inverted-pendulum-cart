@@ -7,6 +7,9 @@
 #include "lqr.h"
 #include "localisation_kalman.h"
 
+#define START_BUTTON_PIN  10
+#define CONTROL_SELECT_BUTTON_PIN  12
+
 LocalisationKalman kalman;
 LQRController lqr(2.0, 1.0, 0.5, 0.1); // Random gains, need to be computed
 
@@ -21,12 +24,14 @@ unsigned long last_loop_time = 0;
 
 const float desired_speed = 0.5; // m/s
 
+int control_mode = 0; // 0 = LQR, 1 = PID
+
 void setup() {
   Serial.begin(115200);
-  delay(1500);
-  Serial.println("Setup starting...");
-  Serial.flush();
 
+  Serial.flush();
+  Serial.println("Setup starting...");
+  
   Serial.println("Initialising Motoron controller...");
   motor_setup();
   Serial.println("Motoron initialisation complete.");
@@ -39,8 +44,45 @@ void setup() {
   motor_encoder_setup();
   Serial.println("Motor Encoder initialisation complete.");
 
-  Serial.println("Setup complete. Entering loop.");
-  Serial.flush();
+  pinMode(START_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
+
+  Serial.println("Setup complete. Waiting for start button to be pressed...");
+
+  while (digitalRead(START_BUTTON_PIN) == HIGH) {
+    double start_time = micros();
+
+    while (digitalRead(CONTROL_SELECT_BUTTON_PIN) == HIGH) {
+
+      // wait for 300ms button press before changing control mode
+      if (micros() - start_time > 300000) {
+        control_mode = control_mode + 1;
+
+        if (control_mode > 1) {
+          control_mode = 0;
+        }
+
+        Serial.print("Control mode: ");
+
+        switch (control_mode) {
+          case 0:
+            Serial.println("LQR");
+            break;
+
+          case 1:
+            Serial.println("PID");
+            break;
+
+          default:
+            Serial.println("Unknown");
+            break;
+        }
+
+        // exit loop to reset start time
+        break;
+      }
+    }
+  }
 }
 
 void loop() {
