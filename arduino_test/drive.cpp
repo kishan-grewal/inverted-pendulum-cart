@@ -30,11 +30,11 @@ void motors_init()
 
 void motor_setup()
 {
-  Wire1.begin();
+  Wire.begin();
   
   // Set the I2C bus for both motor controllers
-  motor_driver_front.setBus(&Wire1);
-  motor_driver_back.setBus(&Wire1);
+  motor_driver_front.setBus(&Wire);
+  motor_driver_back.setBus(&Wire);
   
   motor_driver_front.reinitialize();
   motor_driver_back.reinitialize();
