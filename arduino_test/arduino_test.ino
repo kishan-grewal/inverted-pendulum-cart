@@ -45,7 +45,8 @@ void setup() {
   Serial.println("Motor Encoder initialisation complete.");
 
   // LQR output is force [N]; limit to avoid excessive acceleration
-  lqr.setOutputLimits(-10.0f, 10.0f);
+  // lqr.setOutputLimits(-10.0f, 10.0f);
+  lqr.setOutputLimits(-15.0f, 15.0f);  // F_max = M_t * g = 1.515 * 9.81 = 14.86 N
 
   Serial.println("Setup complete. Entering loop.");
   Serial.flush();
