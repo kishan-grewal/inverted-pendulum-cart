@@ -10,12 +10,12 @@
 
 #define START_BUTTON_PIN  10
 #define CONTROL_SELECT_BUTTON_PIN  12
+#define TASK_SELECT_BUTTON_PIN  13
 
 LocalisationKalman kalman;
 LQRController lqr(-140.122f, -176.530f, -1042.636f, -155.076f);
 
-float pendulum_encoder_angle = 0.0f;
-const float pendulum_pulses_per_revolution = 1000.0f;
+float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
 
 #define AVG_SIZE 10
@@ -30,6 +30,7 @@ static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
 int control_mode = 0; // 0 = LQR, 1 = PID
+int task_mode = 0; //0 = stabilisation, 1 = sprint
 
 const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
@@ -49,7 +50,7 @@ void setup() {
   motor_setup();
   Serial.println("Motoron initialisation complete.");
 
-  pendulum_encoder_setup();
+  pendulumEncoder_init();
   Serial.println("Pendulum Encoder initialisation complete.");
 
   motorEncoders_init();
@@ -59,15 +60,21 @@ void setup() {
 
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(TASK_SELECT_BUTTON_PIN, INPUT_PULLUP);
 
   Serial.println("Setup complete. Waiting for start button to be pressed...");
 
   while (digitalRead(START_BUTTON_PIN) == HIGH) {
     static bool control_mode_changed = false;
+    static bool task_mode_changed = false;
 
     // Reset flag when control select button is released
     if (digitalRead(CONTROL_SELECT_BUTTON_PIN) == HIGH) {
       control_mode_changed = false;
+    }
+
+    if (digitalRead(TASK_SELECT_BUTTON_PIN) == HIGH) {
+      task_mode_changed = false;
     }
 
     unsigned long start_time = micros();
@@ -103,6 +110,38 @@ void setup() {
         break;
       }
     }
+
+    while (digitalRead(TASK_SELECT_BUTTON_PIN) == LOW) {
+
+      // wait for 200ms button press before changing task mode
+      if ((micros() - start_time > 200000) && !task_mode_changed) {
+        task_mode = task_mode + 1;
+        task_mode_changed = true;
+
+        if (task_mode > 1) {
+          task_mode = 0;
+        }
+
+        Serial.print("Task mode: ");
+
+        switch (task_mode) {
+          case 0:
+            Serial.println("Stabilisation");
+            break;
+
+          case 1:
+            Serial.println("Sprint");
+            break;
+
+          default:
+            Serial.println("Unknown");
+            break;
+        }
+
+        // exit inner loop to reset start time
+        break;
+      }
+    }
   }
 
   delay(1000);
@@ -111,27 +150,47 @@ void setup() {
 }
 
 void loop() {
-  // Safely read pendulum encoder count
-  noInterrupts();
-  long pendulum_current_count = pendulum_encoder_pulse_count;
-  interrupts();
 
-  pendulum_encoder_angle = (pendulum_current_count / pendulum_pulses_per_revolution) * 360.0f;
 
-  if (pendulum_encoder_angle > 360.0f){
-    pendulum_encoder_angle = fmod(pendulum_encoder_angle, 360.0f);
-  } else if (pendulum_encoder_angle < 0.0f){
-    pendulum_encoder_angle += 360.0f;
+  // Pause: 20ms press stops loop. Resume: 200ms hold to continue (then reset time/PIDs to avoid windup).
+  if (digitalRead(START_BUTTON_PIN) == LOW) {
+    unsigned long pause_start = micros();
+    while (digitalRead(START_BUTTON_PIN) == LOW) {
+      if ((micros() - pause_start) >= 20000) {
+        // 20ms held: we're paused. Wait for release, then 200ms hold to continue.
+        Serial.println("Paused");
+        while (digitalRead(START_BUTTON_PIN) == HIGH) {
+          delay(5);
+        }
+        unsigned long hold_start = micros();
+        while (true) {
+          if (digitalRead(START_BUTTON_PIN) == HIGH) {
+            hold_start = micros();
+          } else if ((micros() - hold_start) >= 200000) {
+            break;  // 200ms hold to continue
+          }
+          delay(5);
+        }
+        // Reset time and integrators so no windup on first frame after resume
+        reset_motor_pids();
+        last_loop_time = micros();
+        cascaded_pid.reset();
+        v_target = 0.0f;
+        u_prev   = 0.0f;
+        Serial.println("Resumed");
+        // Wait for release so next loop() iteration doesn't re-enter pause
+        while (digitalRead(START_BUTTON_PIN) == LOW) {
+          delay(5);
+        }
+        break;
+      }
+    }
   }
 
-  pendulum_encoder_angle += CALIBRATION_OFFSET_DEG;
-
-  if (pendulum_encoder_angle > 180.0f){
-    pendulum_encoder_angle -= 360.0f;
-  }
-  else if (pendulum_encoder_angle < -180.0f){
-    pendulum_encoder_angle += 360.0f;
-  }
+  
+  // Unwrapped radians from encoder; apply calibration
+  float angle_rad = get_pendulum_angle_rad() + (CALIBRATION_OFFSET_DEG * (3.14159265f / 180.0f));
+  pendulum_encoder_angle = angle_rad * (180.0f / 3.14159265f);  // degrees for Serial/display
 
   // Timing
   unsigned long current_time = micros();
@@ -176,9 +235,8 @@ void loop() {
 
   // Kalman filter
   float z_cart[4] = {d1, d2, d3, d4};
-  float theta_rad  = pendulum_encoder_angle * (3.14159265f / 180.0f);
   float z_velocity = (speeds[0] + speeds[1] + speeds[2] + speeds[3]) / 4.0f;
-  kalman.update(u_prev, z_cart, 4, theta_rad, dt, z_velocity);
+  kalman.update(u_prev, z_cart, 4, angle_rad, dt, z_velocity);
 
   float estimated_position = kalman.getPosition();
   float estimated_velocity = kalman.getVelocity();
