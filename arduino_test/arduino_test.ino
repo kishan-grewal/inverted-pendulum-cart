@@ -12,7 +12,7 @@
 #define CONTROL_SELECT_BUTTON_PIN  12
 
 LocalisationKalman kalman;
-LQRController lqr(-99.081f, -103.15984f, -496.930798f, -97.132137f);
+LQRController lqr(-99.081f, -125.407f, -748.443f, -113.548f);
 
 float pendulum_encoder_angle = 0.0f;
 const float pendulum_pulses_per_revolution = 1000.0f;
@@ -31,7 +31,7 @@ static float u_prev   = 0.0f;
 
 int control_mode = 0; // 0 = LQR, 1 = PID
 
-const float PENDULUM_KP = 0.5f;
+const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
 const float PENDULUM_KD = 0.001f;
 const float PENDULUM_X_KP = 10.0f;
@@ -199,7 +199,7 @@ void loop() {
     v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
     u_prev    = lqr_force;
 
-    desired_speed = v_target;
+    desired_speed = -v_target;
 
   } else if (control_mode == 1) {
     // PID

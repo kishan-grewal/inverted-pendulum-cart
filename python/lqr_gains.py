@@ -47,7 +47,7 @@ def calculate_lqr_gains():
     # Bryson's rule
     x_max         = 0.15              # [m]
     x_dot_max     = 0.5               # [m/s]
-    theta_max     = np.radians(3.0)   # [rad]
+    theta_max     = np.radians(1.5)   # [rad]
     theta_dot_max = np.radians(30.0)  # [rad/s]
     F_max         = M_t * g           # [N] reference force
     R_multipler = 1.0  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
