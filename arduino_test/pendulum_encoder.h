@@ -3,15 +3,14 @@
 
 #include <Arduino.h>
 
-#define encoderA 9 
-#define encoderB 11
-#define encoderI 8
+static constexpr uint8_t encoderA = 9;
+static constexpr uint8_t encoderB = 11;
+static constexpr uint8_t encoderI = 8;
 
-extern volatile long pendulum_encoder_pulse_count; 
-
-void pendulum_encoder_setup();
-void handle_A_rising();
-void handle_B_rising();
-void handle_I_pulse();
+void          pendulumEncoder_init();
+float         get_pendulum_angle_rad();
+bool          pendulumEncoder_isZeroed();
+void          pendulumEncoder_forceZero();
+unsigned long pendulumEncoder_getInvalidCount(); // non-zero = noise/wiring problem
 
 #endif
