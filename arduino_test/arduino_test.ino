@@ -57,8 +57,6 @@ void setup() {
 
   lqr.setOutputLimits(-15.0f, 15.0f);
 
-  last_loop_time = micros();  // prevent large first dt
-
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
 
@@ -108,6 +106,8 @@ void setup() {
   }
 
   delay(1000);
+
+  last_loop_time = micros();  // prevent large first dt
 }
 
 void loop() {
