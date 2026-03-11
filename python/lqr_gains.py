@@ -50,7 +50,7 @@ def calculate_lqr_gains():
     theta_max     = np.radians(1.5)   # [rad]
     theta_dot_max = np.radians(30.0)  # [rad/s]
     F_max         = M_t * g           # [N] reference force
-    R_multipler = 1.0  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
+    R_multipler = 0.5  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
 
     Q = np.diag([
         1.0 / x_max**2,

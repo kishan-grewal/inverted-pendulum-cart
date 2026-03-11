@@ -12,7 +12,7 @@
 #define CONTROL_SELECT_BUTTON_PIN  12
 
 LocalisationKalman kalman;
-LQRController lqr(-99.081f, -125.407f, -748.443f, -113.548f);
+LQRController lqr(-140.122f, -176.530f, -1042.636f, -155.076f);
 
 float pendulum_encoder_angle = 0.0f;
 const float pendulum_pulses_per_revolution = 1000.0f;
