@@ -13,7 +13,7 @@
 #define TASK_SELECT_BUTTON_PIN  13
 
 LocalisationKalman kalman;
-LQRController lqr(-140.122f, -176.530f, -1042.636f, -155.076f);
+LQRController lqr(-140.122f, -193.232f, -1258.706f, -181.211f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -257,7 +257,7 @@ void loop() {
     v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
     u_prev    = lqr_force;
 
-    desired_speed = -v_target;
+    desired_speed = v_target;
 
   } else if (control_mode == 1) {
     // PID
