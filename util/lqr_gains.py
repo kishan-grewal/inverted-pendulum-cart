@@ -47,10 +47,10 @@ def calculate_lqr_gains():
     # Bryson's rule
     x_max         = 0.15              # [m]
     x_dot_max     = 0.5               # [m/s]
-    theta_max     = np.radians(1.2)   # [rad]
+    theta_max     = np.radians(1.5)   # [rad]
     theta_dot_max = np.radians(20.0)  # [rad/s]
     F_max         = M_t * g           # [N] reference force
-    R_multipler = 0.5  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
+    R_multipler = 1.0  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
 
     Q = np.diag([
         1.0 / x_max**2,
@@ -68,7 +68,7 @@ def calculate_lqr_gains():
     K_pp = place_poles(A, B, desired_poles).gain_matrix
 
     print(f"closed loop poles: {E[0].real:.3f}, {E[1].real:.3f}, {E[2]:.3f}, {E[3]:.3f}\n")
-    print(f"LQR:  {K[0,0]:.3f}, {K[0,1]:.3f}, {K[0,2]:.3f}, {K[0,3]:.3f}")
+    print(f"LQR:  {K[0,0]:.3f}f, {K[0,1]:.3f}f, {K[0,2]:.3f}f, {K[0,3]:.3f}f")
     print(f"POLE: {K_pp[0,0]:.3f}, {K_pp[0,1]:.3f}, {K_pp[0,2]:.3f}, {K_pp[0,3]:.3f}")
     print(f"LIMITS: x: {x_max}, xdot: {x_dot_max}, theta: {np.degrees(theta_max):.1f}deg, theta_dot: {np.degrees(theta_dot_max):.1f}deg, F: {F_max:.3f}N")
     

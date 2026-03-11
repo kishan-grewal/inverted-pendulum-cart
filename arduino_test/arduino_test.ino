@@ -13,7 +13,7 @@
 #define TASK_SELECT_BUTTON_PIN  13
 
 LocalisationKalman kalman;
-LQRController lqr(-140.122f, -193.232f, -1258.706f, -181.211f);
+LQRController lqr(-99.081f, -126.986f, -768.153f, -124.546f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
