@@ -32,6 +32,8 @@ static float u_prev   = 0.0f;
 int control_mode = 0; // 0 = LQR, 1 = PID
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
+float x_target = 0.0f;
+
 const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
 const float PENDULUM_KD = 0.001f;
@@ -146,6 +148,10 @@ void setup() {
 
   delay(1000);
 
+  if (task_mode == 1) {
+    x_target = 2.0f;
+  }
+
   last_loop_time = micros();  // prevent large first dt
 }
 
@@ -249,7 +255,7 @@ void loop() {
   if (control_mode == 0) {
     // LQR
     float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
-    float target[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float target[4] = { x_target, 0.0f, 0.0f, 0.0f };
 
     const float M_TOTAL = 1.515f;
     lqr_force = lqr.compute(state, target);
@@ -261,7 +267,7 @@ void loop() {
 
   } else if (control_mode == 1) {
     // PID
-    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, 0.0f, dt);
+    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, x_target, dt);
   }
 
   // Motor PIDs
