@@ -21,7 +21,7 @@ except ImportError:
 
 # Default serial port (match arduino_test.ino upload port)
 DEFAULT_PORT = "COM10"
-BAUD_RATE = 115200
+BAUD_RATE = 250000
 WINDOW_SECONDS = 20.0
 
 # Prefixes sent by arduino_test.ino (throttled ~100 ms)

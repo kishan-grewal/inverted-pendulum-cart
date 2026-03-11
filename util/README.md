@@ -14,7 +14,7 @@ pip install pyserial matplotlib numpy
 
 Records pendulum angle from the Arduino over Serial, updates a plot in real time (MATLAB-style), and at the end saves a timestamped CSV under `util/recordings/`.
 
-**Requirements:** Arduino running and printing lines like `Pendulum Angle: 123.45` at 115200 baud.
+**Requirements:** Arduino running and printing teleplot-style lines (e.g. `>pendulum_angle:123.45` from `arduino_test.ino`) at 250000 baud. Also accepts legacy `Pendulum Angle: 123.45`.
 
 | Argument | Short | Default | Description |
 |----------|--------|---------|-------------|

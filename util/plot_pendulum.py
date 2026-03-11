@@ -16,8 +16,9 @@ import serial
 
 # Default serial port (Windows: COM3, Linux/Mac: /dev/ttyUSB0 or /dev/ttyACM0)
 DEFAULT_PORT = "COM10"
-BAUD_RATE = 115200
+BAUD_RATE = 250000
 PENDULUM_ANGLE_PREFIX = "Pendulum Angle: "
+TELEPLOT_PENDULUM_PREFIX = ">pendulum_angle:"
 
 # Directory for CSV recordings (next to this script)
 RECORDINGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
@@ -130,11 +131,18 @@ def record_angles(port: str, duration: float, on_update=None, stop_flag=None):
             line = ser.readline().decode("utf-8", errors="ignore").strip()
             if not line:
                 continue
-            if not line.startswith(PENDULUM_ANGLE_PREFIX):
-                continue
-            try:
-                angle = float(line.split(": ")[1])
-            except (IndexError, ValueError):
+            angle = None
+            if line.startswith(TELEPLOT_PENDULUM_PREFIX):
+                try:
+                    angle = float(line[len(TELEPLOT_PENDULUM_PREFIX):].strip())
+                except ValueError:
+                    pass
+            elif line.startswith(PENDULUM_ANGLE_PREFIX):
+                try:
+                    angle = float(line.split(": ")[1])
+                except (IndexError, ValueError):
+                    pass
+            if angle is None:
                 continue
             now = time.perf_counter()
             if t_start is None:

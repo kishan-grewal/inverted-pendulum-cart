@@ -230,16 +230,17 @@ void loop() {
   if (current_time - last_print >= 100000) {
     last_print = current_time;
     float dt_cumavg = dt_sum / dt_n;
-    Serial.println(">desired:"            + String(desired_speed,          3));
-    Serial.println(">actual:"             + String(speeds[0],              3));
-    Serial.println(">estimated_velocity:" + String(estimated_velocity,     3));
+    Serial.println(">motor_encoders:"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
+    Serial.println(">desired:"            + String(desired_speed,      3));
+    Serial.println(">actual:"             + String(speeds[0],          3));
+    Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
     Serial.println(">pendulum_angle:"     + String(pendulum_encoder_angle, 3));
-    Serial.println(">lqr_force:"          + String(lqr_force,              3));
-    Serial.println(">kalman_theta:"       + String(kalman.getTheta(),      3));
-    Serial.println(">kalman_v:"           + String(estimated_velocity,     3));
-    Serial.println(">kalman_x:"           + String(estimated_position,     3));
-    Serial.println(">pwm:"               + String((float)pid_fl / 1000.0f, 3));
-    Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,              3));
+    Serial.println(">lqr_force:"          + String(lqr_force,          3));
+    Serial.println(">kalman_theta:"       + String(kalman.getTheta(),  3));
+    Serial.println(">kalman_v:"           + String(estimated_velocity, 3));
+    Serial.println(">kalman_x:"           + String(estimated_position, 3));
+    Serial.println(">pwm:"                + String((float)pid_fl / 1000.0f, 3));
+    Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,          3));
     Serial.println("---");
   }
 }
