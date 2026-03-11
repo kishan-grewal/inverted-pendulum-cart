@@ -30,7 +30,7 @@ void MotorEncoder::update() {
 MotorEncoder ME1(27,28);  // front left
 MotorEncoder ME2(22,23);  // front right
 MotorEncoder ME3(29,30);  // back left
-MotorEncoder ME4(25,26);  // back right
+MotorEncoder ME4(50,49);  // back right
 
 // --- INTERRUPT WRAPPERS ---
 static void isr1() { ME1.update(); }

@@ -11,6 +11,8 @@ void pendulum_encoder_setup() {
     // Attach separate handlers for A and B
     attachInterrupt(digitalPinToInterrupt(encoderA), handle_A_rising, RISING);
 
+    attachInterrupt(digitalPinToInterrupt(encoderB), handle_B_rising, RISING);
+
     // Index pulse for absolute zero
     attachInterrupt(digitalPinToInterrupt(encoderI), handle_I_pulse, RISING);
 }
@@ -26,16 +28,16 @@ void handle_A_rising() {
     }
 }
 
-// void handle_B_rising() {
-//     /* When B rises: 
-//        If A is HIGH, A transitioned first (Clockwise)
-//        If A is LOW, B transitioned first (Counter-Clockwise) */
-//     if (digitalRead(encoderA) == HIGH) {
-//         pendulum_encoder_pulse_count++;
-//     } else {
-//         pendulum_encoder_pulse_count--;
-//     }
-// }
+void handle_B_rising() {
+    /* When B rises: 
+       If A is HIGH, A transitioned first (Clockwise)
+       If A is LOW, B transitioned first (Counter-Clockwise) */
+    if (digitalRead(encoderA) == HIGH) {
+        pendulum_encoder_pulse_count++;
+    } else {
+        pendulum_encoder_pulse_count--;
+    }
+}
 
 void handle_I_pulse() {
     // Reset pulse count to 0 once per full 360-degree rotation

@@ -23,20 +23,20 @@ const float pendulum_pulses_per_revolution = 1000.0f;
 float dt = 0.0f;
 unsigned long last_loop_time = 0;
 
-const float LQR_VELOCITY_MAX =  2.0f;
-const float LQR_VELOCITY_MIN = -2.0f;
+const float LQR_VELOCITY_MAX =  1.0f;
+const float LQR_VELOCITY_MIN = -1.0f;
 
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
 int control_mode = 0; // 0 = LQR, 1 = PID
 
-const float PENDULUM_KP = 0.1f;
+const float PENDULUM_KP = 0.5f;
 const float PENDULUM_KI = 0.00001f;
 const float PENDULUM_KD = 0.001f;
 const float PENDULUM_X_KP = 10.0f;
 const float PENDULUM_X_MAX = 2.0f;
-const float PENDULUM_X_INTEGRAL_LIMIT = 50.0f;
+const float PENDULUM_X_INTEGRAL_LIMIT = 0.2f;
 
 CascadedPID cascaded_pid(PENDULUM_KP, PENDULUM_KI, PENDULUM_KD, PENDULUM_X_KP, PENDULUM_X_MAX, PENDULUM_X_INTEGRAL_LIMIT);
 
@@ -165,14 +165,14 @@ void loop() {
 
   buf_idx = (buf_idx + 1) % AVG_SIZE;
 
-  // Angle guard: only run controller if pendulum is near upright
-  if (fabsf(pendulum_encoder_angle) > 30.0f) {
-    set_motor_speeds(0, 0, 0, 0);
-    v_target = 0.0f;
-    u_prev   = 0.0f;
-    reset_motor_pids();
-    return;
-  }
+  // // Angle guard: only run controller if pendulum is near upright
+  // if (fabsf(pendulum_encoder_angle) > 30.0f) {
+  //   set_motor_speeds(0, 0, 0, 0);
+  //   v_target = 0.0f;
+  //   u_prev   = 0.0f;
+  //   reset_motor_pids();
+  //   return;
+  // }
 
   // Kalman filter
   float z_cart[4] = {d1, d2, d3, d4};
@@ -230,7 +230,7 @@ void loop() {
   if (current_time - last_print >= 100000) {
     last_print = current_time;
     float dt_cumavg = dt_sum / dt_n;
-    Serial.println(">motor_encoders:"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
+    Serial.println(">motor_encoders(FL, FR, BL, BR):"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
     Serial.println(">desired:"            + String(desired_speed,      3));
     Serial.println(">actual:"             + String(speeds[0],          3));
     Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
