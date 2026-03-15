@@ -34,6 +34,15 @@ int task_mode = 0; //0 = stabilisation, 1 = sprint
 
 float x_target = 0.0f;
 
+// Sprint waypoint
+#define SETTLE_WINDOW 500
+const float WAYPOINT_STEP          = 0.1f;
+const float WAYPOINT_STD_THRESHOLD = 0.05f;
+const float SPRINT_TARGET          = 2.0f;
+static float settle_buf[SETTLE_WINDOW] = {};
+static int   settle_idx = 0;
+static int   settle_n   = 0;
+
 const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
 const float PENDULUM_KD = 0.001f;
@@ -148,11 +157,7 @@ void setup() {
 
   delay(1000);
 
-  if (task_mode == 1) {
-    x_target = 2.0f;
-  }
-
-  last_loop_time = micros();  // prevent large first dt
+  last_loop_time = micros();
 }
 
 void loop() {
@@ -183,6 +188,13 @@ void loop() {
         cascaded_pid.reset();
         v_target = 0.0f;
         u_prev   = 0.0f;
+
+        // reset sprint stuff
+        x_target   = 0.0f;
+        settle_n   = 0;
+        settle_idx = 0;
+        memset(settle_buf, 0, sizeof(settle_buf));
+
         Serial.println("Resumed");
         // Wait for release so next loop() iteration doesn't re-enter pause
         while (digitalRead(START_BUTTON_PIN) == LOW) {
@@ -253,7 +265,32 @@ void loop() {
 
   // Set desired speed based on control mode
   if (control_mode == 0) {
-    // LQR
+
+    if (task_mode == 1 && x_target < SPRINT_TARGET) {
+      float err = estimated_position - x_target;
+      settle_buf[settle_idx] = err;
+      settle_idx = (settle_idx + 1) % SETTLE_WINDOW;
+      if (settle_n < SETTLE_WINDOW) settle_n++;
+
+      if (settle_n == SETTLE_WINDOW) {
+        float mean = 0.0f;
+        for (int i = 0; i < SETTLE_WINDOW; i++) mean += settle_buf[i];
+        mean /= SETTLE_WINDOW;
+
+        float var = 0.0f;
+        for (int i = 0; i < SETTLE_WINDOW; i++)
+          var += (settle_buf[i] - mean) * (settle_buf[i] - mean);
+        float std = sqrtf(var / SETTLE_WINDOW);
+
+        if (std < WAYPOINT_STD_THRESHOLD) {
+          x_target   = min(x_target + WAYPOINT_STEP, SPRINT_TARGET);
+          settle_n   = 0;
+          settle_idx = 0;
+          memset(settle_buf, 0, sizeof(settle_buf));
+        }
+      }
+    }
+
     float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
     float target[4] = { x_target, 0.0f, 0.0f, 0.0f };
 
@@ -266,8 +303,8 @@ void loop() {
     desired_speed = v_target;
 
   } else if (control_mode == 1) {
-    // PID
-    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, x_target, dt);
+    float pid_x_target = (task_mode == 1) ? SPRINT_TARGET : 0.0f;
+    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, pid_x_target, dt);
   }
 
   // Motor PIDs
@@ -294,7 +331,7 @@ void loop() {
   if (current_time - last_print >= 100000) {
     last_print = current_time;
     float dt_cumavg = dt_sum / dt_n;
-    Serial.println(">motor_encoders(FL, FR, BL, BR):"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
+    Serial.println(">motor_encoders(FL, FR, BL, BR):" + String(d1, 3) + "," + String(d2, 3) + "," + String(d3, 3) + "," + String(d4, 3));
     Serial.println(">desired:"            + String(desired_speed,      3));
     Serial.println(">actual:"             + String(speeds[0],          3));
     Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
@@ -305,6 +342,7 @@ void loop() {
     Serial.println(">kalman_x:"           + String(estimated_position, 3));
     Serial.println(">pwm:"                + String((float)pid_fl / 1000.0f, 3));
     Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,          3));
+    Serial.println(">x_target:" + String(x_target, 3));
     Serial.println("---");
   }
 }
