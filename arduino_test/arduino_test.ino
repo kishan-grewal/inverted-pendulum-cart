@@ -14,6 +14,7 @@
 
 LocalisationKalman kalman;
 LQRController lqr(-99.081f, -145.698f, -1020.569f, -128.843f);
+LQRController pole(-99.081f, -145.698f, -1020.569f, -128.843f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -29,7 +30,7 @@ const float LQR_VELOCITY_MIN = -1.0f;
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
-int control_mode = 0; // 0 = LQR, 1 = PID
+int control_mode = 0; // 0 = LQR, 1 = pole placement
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
 float x_target = 0.0f;
@@ -68,6 +69,12 @@ void setup() {
   Serial.println("Motor Encoder initialisation complete.");
 
   lqr.setOutputLimits(-15.0f, 15.0f);
+  // possibly increase force limit for faster acceleration for angle recovery task
+  // lqr.setOutputLimits(-30.0f, 30.0f);
+
+  pole.setOutputLimits(-15.0f, 15.0f);
+  // possibly increase force limit for faster acceleration for angle recovery task
+  // pole.setOutputLimits(-30.0f, 30.0f);
 
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
@@ -109,7 +116,7 @@ void setup() {
             break;
 
           case 1:
-            Serial.println("PID");
+            Serial.println("Pole Placement");
             break;
 
           default:
@@ -263,49 +270,47 @@ void loop() {
 
   float lqr_force = 0.0f;
 
-  // Set desired speed based on control mode
-  if (control_mode == 0) {
+  // if in sprint mode calculate checkpoints
+  if (task_mode == 1 && x_target < SPRINT_TARGET) {
+    float err = estimated_position - x_target;
+    settle_buf[settle_idx] = err;
+    settle_idx = (settle_idx + 1) % SETTLE_WINDOW;
+    if (settle_n < SETTLE_WINDOW) settle_n++;
 
-    if (task_mode == 1 && x_target < SPRINT_TARGET) {
-      float err = estimated_position - x_target;
-      settle_buf[settle_idx] = err;
-      settle_idx = (settle_idx + 1) % SETTLE_WINDOW;
-      if (settle_n < SETTLE_WINDOW) settle_n++;
+    if (settle_n == SETTLE_WINDOW) {
+      float mean = 0.0f;
+      for (int i = 0; i < SETTLE_WINDOW; i++) mean += settle_buf[i];
+      mean /= SETTLE_WINDOW;
 
-      if (settle_n == SETTLE_WINDOW) {
-        float mean = 0.0f;
-        for (int i = 0; i < SETTLE_WINDOW; i++) mean += settle_buf[i];
-        mean /= SETTLE_WINDOW;
+      float var = 0.0f;
+      for (int i = 0; i < SETTLE_WINDOW; i++)
+        var += (settle_buf[i] - mean) * (settle_buf[i] - mean);
+      float std = sqrtf(var / SETTLE_WINDOW);
 
-        float var = 0.0f;
-        for (int i = 0; i < SETTLE_WINDOW; i++)
-          var += (settle_buf[i] - mean) * (settle_buf[i] - mean);
-        float std = sqrtf(var / SETTLE_WINDOW);
-
-        if (std < WAYPOINT_STD_THRESHOLD) {
-          x_target   = min(x_target + WAYPOINT_STEP, SPRINT_TARGET);
-          settle_n   = 0;
-          settle_idx = 0;
-          memset(settle_buf, 0, sizeof(settle_buf));
-        }
+      if (std < WAYPOINT_STD_THRESHOLD) {
+        x_target   = min(x_target + WAYPOINT_STEP, SPRINT_TARGET);
+        settle_n   = 0;
+        settle_idx = 0;
+        memset(settle_buf, 0, sizeof(settle_buf));
       }
     }
-
-    float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
-    float target[4] = { x_target, 0.0f, 0.0f, 0.0f };
-
-    const float M_TOTAL = 1.515f;
-    lqr_force = lqr.compute(state, target);
-    v_target += (lqr_force / M_TOTAL) * dt;
-    v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
-    u_prev    = lqr_force;
-
-    desired_speed = v_target;
-
-  } else if (control_mode == 1) {
-    float pid_x_target = (task_mode == 1) ? SPRINT_TARGET : 0.0f;
-    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, pid_x_target, dt);
   }
+
+  float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
+  float target[4] = { x_target, 0.0f, 0.0f, 0.0f };
+
+  const float M_TOTAL = 1.515f;
+  if (control_mode == 0) {
+    lqr_force = lqr.compute(state, target);
+  }
+  else {
+    lqr_force = pole.compute(state, target);
+  }
+  v_target += (lqr_force / M_TOTAL) * dt;
+  v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
+  u_prev    = lqr_force;
+
+  desired_speed = v_target;
 
   // Motor PIDs
   int16_t pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
