@@ -64,12 +64,12 @@ def calculate_lqr_gains():
     K, S, E = control.lqr(A, B, Q, R)
 
     from scipy.signal import place_poles
-    desired_poles = [E[0], E[1], -2.0 + 1.0j, -2.0 - 1.0j] # Keep the original LQR poles for x and x_dot, but place the theta poles further left for faster response
+    desired_poles = [E[0], E[1], -1 + E[2].imag * 1j, -1 + E[3].imag * 1j] # Keep the original LQR poles for x and x_dot, but place the theta poles further left for faster response
     K_pp = place_poles(A, B, desired_poles).gain_matrix
 
     print(f"closed loop poles: {E[0].real:.3f}, {E[1].real:.3f}, {E[2]:.3f}, {E[3]:.3f}\n")
     print(f"LQR:  {K[0,0]:.3f}f, {K[0,1]:.3f}f, {K[0,2]:.3f}f, {K[0,3]:.3f}f")
-    print(f"POLE: {K_pp[0,0]:.3f}, {K_pp[0,1]:.3f}, {K_pp[0,2]:.3f}, {K_pp[0,3]:.3f}")
+    print(f"POLE: {K_pp[0,0]:.3f}f, {K_pp[0,1]:.3f}f, {K_pp[0,2]:.3f}f, {K_pp[0,3]:.3f}f")
     print(f"LIMITS: x: {x_max}, xdot: {x_dot_max}, theta: {np.degrees(theta_max):.1f}deg, theta_dot: {np.degrees(theta_dot_max):.1f}deg, F: {F_max:.3f}N")
     
     # print("-" * 55)
