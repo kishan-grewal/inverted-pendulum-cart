@@ -25,6 +25,7 @@ unsigned long last_loop_time = 0;
 
 const float LQR_VELOCITY_MAX =  1.0f;
 const float LQR_VELOCITY_MIN = -1.0f;
+const bool ANGLED_START_ENABLED = true;  // Set false to bypass angled-start jerk and run plain LQR
 
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
@@ -183,6 +184,8 @@ void loop() {
         cascaded_pid.reset();
         v_target = 0.0f;
         u_prev   = 0.0f;
+        // NEW JERK CODE: re-arm one-shot angled start after pause/resume.
+        runAngledStartOnce(0.0f, v_target, u_prev, true);
         Serial.println("Resumed");
         // Wait for release so next loop() iteration doesn't re-enter pause
         while (digitalRead(START_BUTTON_PIN) == LOW) {
@@ -197,6 +200,13 @@ void loop() {
   // Unwrapped radians from encoder; apply calibration
   float angle_rad = get_pendulum_angle_rad() + (CALIBRATION_OFFSET_DEG * (3.14159265f / 180.0f));
   pendulum_encoder_angle = angle_rad * (180.0f / 3.14159265f);  // degrees for Serial/display
+
+  // NEW JERK CODE:
+  // In LQR mode, run one-shot angled start first.
+  // If true is returned, this cycle was handled by jerk logic.
+  if (control_mode == 0 && ANGLED_START_ENABLED && runAngledStartOnce(pendulum_encoder_angle, v_target, u_prev)) {
+    return;
+  }
 
   // Timing
   unsigned long current_time = micros();
