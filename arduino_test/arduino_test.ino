@@ -35,7 +35,20 @@ int task_mode = 0; //0 = stabilisation, 1 = sprint
 float start_time = 0.0f;
 float x_final = 0.0f;
 float x_target = 0.0f;
-float total_sprint_time = 20.0f; //seconds
+
+// Sprint trajectory parameters (1 m move; sign = direction)
+const float SPRINT_DISTANCE_M = -1.0f;
+const float SPRINT_A_MAX      = 0.1f;   // [m/s^2] conservative acceleration
+const float SPRINT_V_MAX      = 0.25f;  // [m/s]   conservative cruise speed
+
+// Derived sprint timing (computed in setup)
+float sprint_t_accel  = 0.0f;  // duration of accel phase  [s]
+float sprint_t_cruise = 0.0f;  // duration of cruise phase [s]
+float sprint_t_total  = 0.0f;  // total sprint duration    [s]
+
+// Sprint state
+bool  sprint_active   = false;
+float sprint_x_start  = 0.0f;
 
 const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
@@ -155,6 +168,32 @@ void setup() {
     x_final = 2.0f;
   }
 
+  // Pre-compute sprint timings for trapezoidal/triangular profile
+  {
+    const float D_signed = SPRINT_DISTANCE_M;
+    const float D        = fabsf(D_signed);   // use magnitude for timing
+    const float a        = SPRINT_A_MAX;
+    const float vm       = SPRINT_V_MAX;
+
+    float t_accel = vm / a;
+    float d_accel = 0.5f * a * t_accel * t_accel;
+
+    if (2.0f * d_accel >= D) {
+      // Triangular profile: no cruise, reduce peak speed
+      t_accel = sqrtf(D / a);
+      sprint_t_accel  = t_accel;
+      sprint_t_cruise = 0.0f;
+      sprint_t_total  = 2.0f * t_accel;
+    } else {
+      // Trapezoidal profile with cruise
+      float d_cruise = D - 2.0f * d_accel;
+      float t_cruise = d_cruise / vm;
+      sprint_t_accel  = t_accel;
+      sprint_t_cruise = t_cruise;
+      sprint_t_total  = 2.0f * t_accel + t_cruise;
+    }
+  }
+
   start_time = micros();
   last_loop_time = micros();  // prevent large first dt
 }
@@ -235,12 +274,13 @@ void loop() {
 
   buf_idx = (buf_idx + 1) % AVG_SIZE;
 
-  // // Angle guard: only run controller if pendulum is near upright
+  // Angle guard: only run controller if pendulum is near upright
   // if (fabsf(pendulum_encoder_angle) > 30.0f) {
   //   set_motor_speeds(0, 0, 0, 0);
   //   v_target = 0.0f;
   //   u_prev   = 0.0f;
   //   reset_motor_pids();
+  //   sprint_active = false;
   //   return;
   // }
 
@@ -257,16 +297,90 @@ void loop() {
   float lqr_force = 0.0f;
 
   current_time = micros();
-  float tau = (current_time - start_time) / (total_sprint_time * 1000000.0f);
-  if (tau < 0.0f) tau = 0.0f;
-  if (tau > 1.0f) tau = 1.0f;
-  x_target = x_final * tau;
+
+  // Compute sprint reference trajectory (position & velocity) and pendulum lean
+  float x_ref        = 0.0f;
+  float xdot_ref     = 0.0f;
+  float theta_ref    = 0.0f;
+  float theta_dot_ref = 0.0f;
+
+  if (task_mode == 1) {
+    if (!sprint_active) {
+      // Lazily initialise sprint start on first loop in sprint mode
+      sprint_active  = true;
+      sprint_x_start = estimated_position;
+      start_time     = current_time;
+    }
+
+    float t = (current_time - start_time) / 1000000.0f;  // [s] since sprint start
+
+    if (t >= sprint_t_total) {
+      // Sprint finished: hold final position and upright pendulum
+      x_ref         = sprint_x_start + SPRINT_DISTANCE_M;
+      xdot_ref      = 0.0f;
+      theta_ref     = 0.0f;
+      theta_dot_ref = 0.0f;
+      sprint_active = false;
+    } else {
+      const float t1 = sprint_t_accel;
+      const float t2 = sprint_t_accel + sprint_t_cruise;
+      const float a  = SPRINT_A_MAX;
+      const float vm = SPRINT_V_MAX;
+      const float dir = (SPRINT_DISTANCE_M >= 0.0f) ? 1.0f : -1.0f;
+
+      if (t < t1) {
+        // Acceleration phase
+        xdot_ref = dir * (a * t);
+        x_ref    = sprint_x_start + dir * (0.5f * a * t * t);
+        // Small forward lean during acceleration
+        const float theta_fwd_rad = 5.0f * (3.14159265f / 180.0f);  // 5 degrees
+        theta_ref     = theta_fwd_rad * (t / t1);
+        theta_dot_ref = theta_fwd_rad / t1;
+      } else if (t < t2) {
+        // Cruise phase (if any)
+        xdot_ref = dir * vm;
+        float d_accel = 0.5f * a * t1 * t1;
+        x_ref    = sprint_x_start + dir * (d_accel + vm * (t - t1));
+        theta_ref     = 0.0f;
+        theta_dot_ref = 0.0f;
+      } else {
+        // Deceleration phase
+        float t_dec       = t - t2;
+        float t_dec_total = sprint_t_total - t2;
+
+        // Mirror of acceleration, coming to rest at D
+        float d_accel      = 0.5f * a * t1 * t1;
+        float d_cruise     = vm * sprint_t_cruise;
+        float d_before_dec = d_accel + d_cruise;
+
+        xdot_ref = dir * (vm - a * t_dec);
+        x_ref    = sprint_x_start + dir * (d_before_dec + vm * t_dec - 0.5f * a * t_dec * t_dec);
+
+        // Smoothly return to upright during braking
+        const float theta_fwd_rad = 5.0f * (3.14159265f / 180.0f);
+        float alpha = (t_dec_total > 0.0f) ? (1.0f - t_dec / t_dec_total) : 0.0f;
+        if (alpha < 0.0f) alpha = 0.0f;
+        if (alpha > 1.0f) alpha = 1.0f;
+        theta_ref     = theta_fwd_rad * alpha;
+        theta_dot_ref = (theta_fwd_rad * (alpha - 1.0f)) / (t_dec_total > 0.0f ? t_dec_total : 1.0f);
+      }
+    }
+  } else {
+    // Stabilisation task: hold current estimated position
+    x_ref         = estimated_position;
+    xdot_ref      = 0.0f;
+    theta_ref     = 0.0f;
+    theta_dot_ref = 0.0f;
+    sprint_active = false;
+  }
+
+  x_target = x_ref;
 
   // Set desired speed based on control mode
   if (control_mode == 0) {
     // LQR
     float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
-    float target[4] = { x_target, 0.0f, 0.0f, 0.0f };
+    float target[4] = { x_ref, xdot_ref, theta_ref, theta_dot_ref };
 
     const float M_TOTAL = 1.515f;
     lqr_force = lqr.compute(state, target);
@@ -314,6 +428,9 @@ void loop() {
     Serial.println(">kalman_theta:"       + String(kalman.getTheta(),  3));
     Serial.println(">kalman_v:"           + String(estimated_velocity, 3));
     Serial.println(">kalman_x:"           + String(estimated_position, 3));
+    Serial.println(">x_ref:"              + String(x_ref,              3));
+    Serial.println(">theta_ref:"          + String(theta_ref * (180.0f / 3.14159265f), 3));
+    Serial.println(">sprint_active:"      + String(sprint_active ? 1 : 0));
     Serial.println(">pwm:"                + String((float)pid_fl / 1000.0f, 3));
     Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,          3));
     Serial.println("---");
