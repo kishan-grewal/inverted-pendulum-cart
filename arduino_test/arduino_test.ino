@@ -13,7 +13,7 @@
 #define TASK_SELECT_BUTTON_PIN  13
 
 LocalisationKalman kalman;
-LQRController lqr(-99.081f, -144.521f, -1017.036f, -127.367f);
+LQRController lqr(-99.081f, -126.538f, -752.271f, -114.871f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -39,7 +39,7 @@ float x_target = 0.0f;
 // Sprint trajectory parameters (1 m move; sign = direction)
 const float SPRINT_DISTANCE_M = -1.0f;
 const float SPRINT_A_MAX      = 0.1f;   // [m/s^2] conservative acceleration
-const float SPRINT_V_MAX      = 0.25f;  // [m/s]   conservative cruise speed
+const float SPRINT_V_MAX      = 0.175f;  // [m/s]   conservative cruise speed
 
 // Derived sprint timing (computed in setup)
 float sprint_t_accel  = 0.0f;  // duration of accel phase  [s]
@@ -333,7 +333,7 @@ void loop() {
         xdot_ref = dir * (a * t);
         x_ref    = sprint_x_start + dir * (0.5f * a * t * t);
         // Small forward lean during acceleration
-        const float theta_fwd_rad = 5.0f * (3.14159265f / 180.0f);  // 5 degrees
+        const float theta_fwd_rad = 7.0f * (3.14159265f / 180.0f);  // 5 degrees
         theta_ref     = theta_fwd_rad * (t / t1);
         theta_dot_ref = theta_fwd_rad / t1;
       } else if (t < t2) {
