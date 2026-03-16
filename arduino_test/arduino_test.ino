@@ -13,7 +13,7 @@
 #define TASK_SELECT_BUTTON_PIN  13
 
 LocalisationKalman kalman;
-LQRController lqr(-99.081f, -145.698f, -1020.569f, -128.843f);
+LQRController lqr(-99.081f, -144.521f, -1017.036f, -127.367f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -23,8 +23,8 @@ float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 float dt = 0.0f;
 unsigned long last_loop_time = 0;
 
-const float LQR_VELOCITY_MAX =  1.0f;
-const float LQR_VELOCITY_MIN = -1.0f;
+const float LQR_VELOCITY_MAX =  1.25f;
+const float LQR_VELOCITY_MIN = -1.25f;
 
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
@@ -32,7 +32,10 @@ static float u_prev   = 0.0f;
 int control_mode = 0; // 0 = LQR, 1 = PID
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
+float start_time = 0.0f;
+float x_final = 0.0f;
 float x_target = 0.0f;
+float total_sprint_time = 60.0f; //seconds
 
 const float PENDULUM_KP = 1.0f;
 const float PENDULUM_KI = 0.00001f;
@@ -79,7 +82,7 @@ void setup() {
       task_mode_changed = false;
     }
 
-    unsigned long start_time = micros();
+    start_time = micros();
 
     while (digitalRead(CONTROL_SELECT_BUTTON_PIN) == LOW) {
 
@@ -149,9 +152,10 @@ void setup() {
   delay(1000);
 
   if (task_mode == 1) {
-    x_target = 2.0f;
+    x_final = 2.0f;
   }
 
+  start_time = micros();
   last_loop_time = micros();  // prevent large first dt
 }
 
@@ -250,6 +254,10 @@ void loop() {
   float desired_speed = 0.0f;
 
   float lqr_force = 0.0f;
+
+  current_time = micros();
+
+  x_target = x_final * ((current_time - start_time) / (total_sprint_time * 1000000.0f));
 
   // Set desired speed based on control mode
   if (control_mode == 0) {
