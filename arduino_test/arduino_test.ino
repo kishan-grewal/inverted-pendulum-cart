@@ -14,6 +14,7 @@
 
 LocalisationKalman kalman;
 LQRController lqr(-99.081f, -128.098f, -757.579f, -116.691f);
+LQRController pole(-99.081f, -128.098f, -757.579f, -116.691f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -29,7 +30,7 @@ const float LQR_VELOCITY_MIN = -1.25f;
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
-int control_mode = 0; // 0 = LQR, 1 = PID
+int control_mode = 1; // 0 = LQR, 1 = POLE
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
 float start_time = 0.0f;
@@ -75,6 +76,7 @@ void setup() {
   Serial.println("Motor Encoder initialisation complete.");
 
   lqr.setOutputLimits(-15.0f, 15.0f);
+  pole.setOutputLimits(-15.0f, 15.0f);
 
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
@@ -116,7 +118,7 @@ void setup() {
             break;
 
           case 1:
-            Serial.println("PID");
+            Serial.println("POLE");
             break;
 
           default:
@@ -377,23 +379,24 @@ void loop() {
   x_target = x_ref;
 
   // Set desired speed based on control mode
+  // LQR
+  float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
+  float target[4] = { x_ref, xdot_ref, theta_ref, theta_dot_ref };
+
+  const float M_TOTAL = 1.515f;
+
   if (control_mode == 0) {
-    // LQR
-    float state[4]  = { estimated_position, estimated_velocity, kalman.getTheta(), kalman.getThetaVelocity() };
-    float target[4] = { x_ref, xdot_ref, theta_ref, theta_dot_ref };
-
-    const float M_TOTAL = 1.515f;
     lqr_force = lqr.compute(state, target);
-    v_target += (lqr_force / M_TOTAL) * dt;
-    v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
-    u_prev    = lqr_force;
-
-    desired_speed = v_target;
-
-  } else if (control_mode == 1) {
-    // PID
-    desired_speed = cascaded_pid.compute(kalman.getTheta(), kalman.getThetaVelocity(), estimated_position, x_target, dt);
   }
+  else {
+    lqr_force = pole.compute(state, target);
+  }
+
+  v_target += (lqr_force / M_TOTAL) * dt;
+  v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
+  u_prev    = lqr_force;
+
+  desired_speed = v_target;
 
   // Motor PIDs
   int16_t pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
