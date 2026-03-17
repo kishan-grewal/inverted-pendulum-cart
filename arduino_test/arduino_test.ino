@@ -317,8 +317,8 @@ void loop() {
     float t = (current_time - start_time) / 1000000.0f;  // [s] since sprint start
 
     if (t >= sprint_t_total) {
-      // Sprint finished: hold final position and upright pendulum
-      x_ref         = sprint_x_start + SPRINT_DISTANCE_M;
+      // Sprint finished: stabilise about hard-coded origin (x = 0)
+      x_ref         = 0.0f;
       xdot_ref      = 0.0f;
       theta_ref     = 0.0f;
       theta_dot_ref = 0.0f;
@@ -368,8 +368,8 @@ void loop() {
       }
     }
   } else {
-    // Stabilisation task: hold current estimated position
-    x_ref         = estimated_position;
+    // Stabilisation task: stabilise about hard-coded origin (x = 0)
+    x_ref         = 0.0f;
     xdot_ref      = 0.0f;
     theta_ref     = 0.0f;
     theta_dot_ref = 0.0f;
