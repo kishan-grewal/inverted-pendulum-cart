@@ -34,7 +34,7 @@ const float LQR_VELOCITY_MIN = -1.25f;
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
-int control_mode = 1; // 0 = LQR, 1 = POLE
+int control_mode = 0; // 0 = LQR, 1 = POLE
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
 float start_time = 0.0f;

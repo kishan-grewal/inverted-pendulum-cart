@@ -1,7 +1,7 @@
 import numpy as np
 
 # Physical parameters
-M_TOTAL = 1.515  # total system mass [kg]
+M_TOTAL = 1.593  # total system mass [kg]
 m_rod = 0.043  # rod mass [kg]
 m_tip = 0.050  # tip mass [kg]
 m_pend = m_rod + m_tip

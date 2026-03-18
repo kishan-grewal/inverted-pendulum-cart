@@ -3,7 +3,7 @@ import control
 
 def calculate_lqr_gains():
     # Physical parameters — MUST match localisation_kalman.h exactly
-    M_cart_total = 1.515
+    M_cart_total = 1.593
     m_rod   = 0.043
     m_tip   = 0.050
     m_pend  = m_rod + m_tip
