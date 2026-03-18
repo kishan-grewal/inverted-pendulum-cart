@@ -47,7 +47,7 @@ float x_final = 0.0f;
 float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
-const float SPRINT_DISTANCE_M = 1.0f;
+const float SPRINT_DISTANCE_M = 2.0f;
 const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
 const float SPRINT_V_MAX      = 0.175f;  // [m/s]   conservative cruise speed
 
@@ -64,6 +64,7 @@ const float SPRINT_LINEAR_V_SCALE = 0.5f;  // <1 => slower cart motion
 // Sprint state
 bool sprint_active   = false;
 float sprint_x_start  = 0.0f;
+bool sprint_completed = false;
 
 void setup() {
   Serial.begin(250000);
@@ -243,6 +244,8 @@ void loop() {
         start_time_us = last_loop_time;
         v_target = 0.0f;
         u_prev   = 0.0f;
+        sprint_active = false;
+        sprint_completed = false;
 
         Serial.println("Resumed");
 
@@ -296,14 +299,15 @@ void loop() {
   buf_idx = (buf_idx + 1) % AVG_SIZE;
 
   // Angle guard: only run controller if pendulum is near upright
-  // if (fabsf(pendulum_encoder_angle) > 30.0f) {
-  //   set_motor_speeds(0, 0, 0, 0);
-  //   v_target = 0.0f;
-  //   u_prev   = 0.0f;
-  //   reset_motor_pids();
-  //   sprint_active = false;
-  //   return;
-  // }
+  if (fabsf(pendulum_encoder_angle) > 50.0f) {
+    set_motor_speeds(0, 0, 0, 0);
+    v_target = 0.0f;
+    u_prev   = 0.0f;
+    reset_motor_pids();
+    sprint_active = false;
+    sprint_completed = false;
+    return;
+  }
 
   // Kalman filter
   float z_cart[4] = {d1, d2, d3, d4};
@@ -326,7 +330,7 @@ void loop() {
   float theta_dot_ref = 0.0f;
 
   if (task_mode == 1) {
-    if (!sprint_active) {
+    if (!sprint_active && !sprint_completed) {
       // Lazily initialise sprint start on first loop in sprint mode
       sprint_active  = true;
       sprint_x_start = estimated_position;
@@ -354,6 +358,7 @@ void loop() {
       x_ref = sprint_x_start + dir * D_abs;
       xdot_ref = 0.0f;
       sprint_active = false;
+      sprint_completed = true;
     } else {
       float s = t / t_total_linear;  // 0..1
       if (s < 0.0f) s = 0.0f;
@@ -370,6 +375,7 @@ void loop() {
     theta_ref     = 0.0f;
     theta_dot_ref = 0.0f;
     sprint_active = false;
+    sprint_completed = false;
   }
 
   x_target = x_ref;
