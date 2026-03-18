@@ -12,13 +12,13 @@
 #define TASK_SELECT_BUTTON_PIN 13
 
 LocalisationKalman kalman;
-LQRController lqr_stabilise(-99.081f, -145.698f, -1020.569f, -128.843f);
-LQRController pole_stabilise(-99.987f, -146.897f, -1021.826f, -129.500f);
+LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
+LQRController pole_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 
-LQRController lqr_sprint(-99.081f, -126.538f, -752.271f, -114.871f);
-LQRController pole_sprint(-78.323f, -101.584f, -720.590f, -101.097f);
+LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
+LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
-const float LQR_FORCE_LIMIT = 15.0f; //+- N
+const float LQR_FORCE_LIMIT = 15.627f; //+- N
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
