@@ -14,7 +14,7 @@
 
 LocalisationKalman kalman;
 LQRController lqr(-99.081f, -145.698f, -1020.569f, -128.843f);
-LQRController pole(-437.643f, -379.765f, -1348.543f, -257.076f);
+LQRController pole(-99.987f, -146.897f, -1021.826f, -129.500f);
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
