@@ -9,6 +9,9 @@ class LocalisationKalman {
     float theta   = 0.0f;
     float theta_v = 0.0f;
 
+    // Predicted (a priori) state snapshot from last update() call
+    float v_pred_last = 0.0f;
+
     float P[4][4] = {
       {1.0f, 0.0f, 0.0f, 0.0f},
       {0.0f, 1.0f, 0.0f, 0.0f},
@@ -91,6 +94,9 @@ class LocalisationKalman {
       theta   += dtheta;
       theta_v += dtheta_v;
 
+      // Snapshot predicted velocity before measurement updates
+      v_pred_last = v;
+
       // Propagate covariance: P = F*P*F' + Q, where F = I + A*dt
       float FP[4][4];
       for (int j = 0; j < 4; j++) {
@@ -122,6 +128,7 @@ class LocalisationKalman {
 
     float getPosition()      { return x; }
     float getVelocity()      { return v; }
+    float getVelocityPred()  { return v_pred_last; }
     float getTheta()         { return theta; }
     float getThetaVelocity() { return theta_v; }
 };

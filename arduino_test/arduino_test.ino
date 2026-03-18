@@ -11,6 +11,45 @@
 #define CONTROL_SELECT_BUTTON_PIN 12
 #define TASK_SELECT_BUTTON_PIN 13
 
+// ===== Kalman + motor PID test (no LQR / pole placement) =====
+// Sawtooth velocity setpoint parameters
+const float SAW_VEL_MIN_MPS = -0.5f;
+const float SAW_VEL_MAX_MPS =  0.5f;
+const float SAW_FREQ_HZ     =  1.0f;
+
+// Measurement noise injection for Kalman (set std dev to 0 to disable)
+const float KALMAN_NOISE_STD_VEL_MPS   = 0.05f;  // noise on measured cart velocity
+const float KALMAN_NOISE_STD_POS_M     = 0.002f; // noise on each wheel distance
+const float KALMAN_NOISE_STD_ANGLE_RAD = 0.002f; // noise on pendulum angle
+
+const bool  USE_SAW_VELOCITY_SETPOINT = true;
+
+static inline float frand01() {
+  return (float)random(0L, 1000000L) / 1000000.0f;
+}
+
+// Approx Gaussian noise using Box–Muller. Safe fallback if u1 hits 0.
+static inline float randn() {
+  float u1 = frand01();
+  if (u1 < 1e-6f) u1 = 1e-6f;
+  float u2 = frand01();
+  return sqrtf(-2.0f * logf(u1)) * cosf(2.0f * 3.14159265f * u2);
+}
+
+static inline float saw_velocity_setpoint_mps(unsigned long now_us, unsigned long t0_us) {
+  const float span = (SAW_VEL_MAX_MPS - SAW_VEL_MIN_MPS);
+  if (SAW_FREQ_HZ <= 0.0f || span == 0.0f) return SAW_VEL_MIN_MPS;
+
+  const float t = (now_us - t0_us) / 1000000.0f;   // seconds since start
+  const float T = 1.0f / SAW_FREQ_HZ;               // period [s]
+
+  float phase = fmodf(t, T) / T;                    // [0,1)
+  if (phase < 0.0f) phase += 1.0f;
+
+  // Rising saw: min -> max then jump back to min at period boundary
+  return SAW_VEL_MIN_MPS + span * phase;
+}
+
 LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 LQRController pole_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
@@ -37,7 +76,7 @@ static float u_prev   = 0.0f;
 int control_mode = 0; // 0 = LQR, 1 = POLE
 int task_mode = 0; //0 = stabilisation, 1 = sprint
 
-float start_time = 0.0f;
+unsigned long start_time_us = 0;
 float x_final = 0.0f;
 float x_target = 0.0f;
 
@@ -60,6 +99,9 @@ void setup() {
 
   Serial.flush();
   Serial.println("Setup starting...");
+
+  // RNG seed for noise injection (best-effort)
+  randomSeed(analogRead(A0) + analogRead(A1));
 
   motor_setup();
   Serial.println("Motoron initialisation complete.");
@@ -94,12 +136,12 @@ void setup() {
       task_mode_changed = false;
     }
 
-    start_time = micros();
+    start_time_us = micros();
 
     while (digitalRead(CONTROL_SELECT_BUTTON_PIN) == LOW) {
 
       // wait for 200ms button press before changing control mode
-      if ((micros() - start_time > 200000) && !control_mode_changed) {
+      if ((micros() - start_time_us > 200000) && !control_mode_changed) {
         control_mode = control_mode + 1;
         control_mode_changed = true;
 
@@ -131,7 +173,7 @@ void setup() {
     while (digitalRead(TASK_SELECT_BUTTON_PIN) == LOW) {
 
       // wait for 200ms button press before changing task mode
-      if ((micros() - start_time > 200000) && !task_mode_changed) {
+      if ((micros() - start_time_us > 200000) && !task_mode_changed) {
         task_mode = task_mode + 1;
         task_mode_changed = true;
 
@@ -196,7 +238,7 @@ void setup() {
     }
   }
 
-  start_time = micros();
+  start_time_us = micros();
   last_loop_time = micros();  // prevent large first dt
 }
 
@@ -230,7 +272,7 @@ void loop() {
         // Reset time and integrators so no windup on first frame after resume
         reset_motor_pids();
         last_loop_time = micros();
-        start_time = last_loop_time;
+        start_time_us = last_loop_time;
         v_target = 0.0f;
         u_prev   = 0.0f;
 
@@ -264,12 +306,14 @@ void loop() {
   static float prev_d[4] = {0, 0, 0, 0};
   float dists[4] = {d1, d2, d3, d4};
   float speeds[4];
+  float raw_speeds[4];
 
   static float speed_buf[4][AVG_SIZE] = {};
   static int buf_idx = 0;
 
   for (int i = 0; i < 4; i++) {
     float raw = (dt > 0.001f) ? (dists[i] - prev_d[i]) / dt : 0.0f;
+    raw_speeds[i] = raw;
 
     prev_d[i] = dists[i];
     speed_buf[i][buf_idx] = raw;
@@ -296,7 +340,22 @@ void loop() {
   // Kalman filter
   float z_cart[4] = {d1, d2, d3, d4};
   float z_velocity = (speeds[0] + speeds[1] + speeds[2] + speeds[3]) / 4.0f;
-  kalman.update(u_prev, z_cart, 4, angle_rad, dt, z_velocity);
+
+  // Optional measurement noise injection (to stress-test Kalman tuning)
+  if (KALMAN_NOISE_STD_POS_M > 0.0f) {
+    for (int i = 0; i < 4; i++) z_cart[i] += KALMAN_NOISE_STD_POS_M * randn();
+  }
+
+  float angle_meas = angle_rad;
+  if (KALMAN_NOISE_STD_ANGLE_RAD > 0.0f) angle_meas += KALMAN_NOISE_STD_ANGLE_RAD * randn();
+
+  float vel_meas = z_velocity;
+  if (KALMAN_NOISE_STD_VEL_MPS > 0.0f) vel_meas += KALMAN_NOISE_STD_VEL_MPS * randn();
+
+  // No model-based control input in this test; keep u_prev at 0
+  if (USE_SAW_VELOCITY_SETPOINT) u_prev = 0.0f;
+
+  kalman.update(u_prev, z_cart, 4, angle_meas, dt, vel_meas);
 
   float estimated_position = kalman.getPosition();
   float estimated_velocity = kalman.getVelocity();
@@ -318,10 +377,10 @@ void loop() {
       // Lazily initialise sprint start on first loop in sprint mode
       sprint_active  = true;
       sprint_x_start = estimated_position;
-      start_time     = current_time;
+      start_time_us  = current_time;
     }
 
-    float t = (current_time - start_time) / 1000000.0f;  // [s] since sprint start
+    float t = (current_time - start_time_us) / 1000000.0f;  // [s] since sprint start
 
     if (t >= sprint_t_total) {
       // Sprint finished: stabilise about hard-coded origin (x = 0)
@@ -397,28 +456,37 @@ void loop() {
 
   const float M_TOTAL = 1.515f;
 
-  if (task_mode == 0) {
-    if (control_mode == 0) {
-      lqr_force = lqr_stabilise.compute(state, target);
+  if (USE_SAW_VELOCITY_SETPOINT) {
+    // Test mode: drive motor PIDs with a sawtooth velocity setpoint (no LQR/pole placement)
+    desired_speed = saw_velocity_setpoint_mps(current_time, start_time_us);
+    desired_speed = constrain(desired_speed, SAW_VEL_MIN_MPS, SAW_VEL_MAX_MPS);
+    lqr_force = 0.0f;
+    v_target = desired_speed;
+  } else {
+    // Original LQR/pole control path (kept for reference)
+    if (task_mode == 0) {
+      if (control_mode == 0) {
+        lqr_force = lqr_stabilise.compute(state, target);
+      }
+      else {
+        lqr_force = pole_stabilise.compute(state, target);
+      }
     }
     else {
-      lqr_force = pole_stabilise.compute(state, target);
+      if (control_mode == 0) {
+        lqr_force = lqr_sprint.compute(state, target);
+      }
+      else {
+        lqr_force = pole_sprint.compute(state, target);
+      }
     }
-  }
-  else {
-    if (control_mode == 0) {
-      lqr_force = lqr_sprint.compute(state, target);
-    }
-    else {
-      lqr_force = pole_sprint.compute(state, target);
-    }
-  }
 
-  v_target += (lqr_force / M_TOTAL) * dt;
-  v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
-  u_prev = lqr_force;
+    v_target += (lqr_force / M_TOTAL) * dt;
+    v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
+    u_prev = lqr_force;
 
-  desired_speed = v_target;
+    desired_speed = v_target;
+  }
 
   // Motor PIDs
   int16_t pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
@@ -427,10 +495,10 @@ void loop() {
   int16_t pid_br = compute_pid_back_right (desired_speed, speeds[3], dt);
 
   // Deadband compensation
-  if (pid_fl > 5) pid_fl += 40; else if (pid_fl < -5) pid_fl -= 40;
-  if (pid_fr > 5) pid_fr += 40; else if (pid_fr < -5) pid_fr -= 40;
-  if (pid_bl > 5) pid_bl += 40; else if (pid_bl < -5) pid_bl -= 40;
-  if (pid_br > 5) pid_br += 40; else if (pid_br < -5) pid_br -= 40;
+  if (pid_fl > 5) pid_fl += 30; else if (pid_fl < -5) pid_fl -= 30;
+  if (pid_fr > 5) pid_fr += 30; else if (pid_fr < -5) pid_fr -= 30;
+  if (pid_bl > 5) pid_bl += 30; else if (pid_bl < -5) pid_bl -= 30;
+  if (pid_br > 5) pid_br += 30; else if (pid_br < -5) pid_br -= 30;
 
   set_motor_speeds(pid_fl, pid_fr, pid_bl, pid_br);
 
@@ -445,9 +513,13 @@ void loop() {
     last_print = current_time;
     float dt_cumavg = dt_sum / dt_n;
     Serial.println(">motor_encoders(FL, FR, BL, BR):"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
+    Serial.println(">motor_speeds(FL, FR, BL, BR):"      + String(speeds[0],          3) + "," + String(speeds[1],          3) + "," + String(speeds[2],          3) + "," + String(speeds[3],          3));
+    Serial.println(">pid_outputs(FL, FR, BL, BR):"       + String(pid_fl)                 + "," + String(pid_fr)                 + "," + String(pid_bl)                 + "," + String(pid_br));
     Serial.println(">desired:"            + String(desired_speed,      3));
     Serial.println(">actual:"             + String(speeds[0],          3));
+    Serial.println(">raw_v1:"             + String(raw_speeds[0],      3));
     Serial.println(">estimated_velocity:" + String(estimated_velocity, 3));
+    Serial.println(">kalman_v_pred:"      + String(kalman.getVelocityPred(), 3));
     Serial.println(">pendulum_angle:"     + String(pendulum_encoder_angle, 3));
     Serial.println(">lqr_force:"          + String(lqr_force,          3));
     Serial.println(">kalman_theta:"       + String(kalman.getTheta(),  3));
