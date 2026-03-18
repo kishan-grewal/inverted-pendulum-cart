@@ -46,9 +46,13 @@ def calculate_lqr_gains():
 
     # Bryson's rule
     x_max         = 0.15              # [m]
-    x_dot_max     = 0.45               # [m/s]
+    x_dot_max     = 0.45              # [m/s]
     theta_max     = np.radians(1.5)   # [rad]
     theta_dot_max = np.radians(30.0)  # [rad/s]
+    
+    # Pole Placement real-value
+    pole_real = -0.996
+
     F_max         = M_t * g           # [N] reference force
     R_multipler = 1.0  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)
 
@@ -64,7 +68,7 @@ def calculate_lqr_gains():
     K, S, E = control.lqr(A, B, Q, R)
 
     from scipy.signal import place_poles
-    desired_poles = [E[0], E[1], -0.8 + E[2].imag * 1.0j, -0.8 - E[2].imag * 1.0j] # Keep the original LQR poles for x and x_dot, but place the theta poles further left for faster response
+    desired_poles = [E[0], E[1], pole_real + E[2].imag * 1.0j, pole_real - E[2].imag * 1.0j] # Keep the original LQR poles for x and x_dot, but place the theta poles further left for faster response
     K_pp = place_poles(A, B, desired_poles).gain_matrix
 
     print(f"LQR closed loop poles: {E[0].real:.3f}, {E[1].real:.3f}, {E[2]:.3f}, {E[3]:.3f}")
