@@ -16,7 +16,9 @@ LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 LQRController pole_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 
 LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
-LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
+LQRController pole_sprint(-104.233f, -133.108f, -791.137f, -120.852f);
+// LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
+// LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
 const float LQR_FORCE_LIMIT = 15.627f; //+- N
 
@@ -46,7 +48,7 @@ float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
 const float SPRINT_DISTANCE_M = 1.0f;
-const float SPRINT_A_MAX      = 0.1f;   // [m/s^2] conservative acceleration
+const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
 const float SPRINT_V_MAX      = 0.175f;  // [m/s]   conservative cruise speed
 
 // Derived sprint timing (computed in setup)
@@ -348,7 +350,7 @@ void loop() {
         x_ref = sprint_x_start + dir * (0.5f * a * t * t);
 
         // Small forward lean during acceleration
-        const float theta_fwd_rad = 7.0f * (3.14159265f / 180.0f);  // 5 degrees
+        const float theta_fwd_rad = 8.0f * (3.14159265f / 180.0f);  // 5 degrees
         theta_ref = theta_fwd_rad * (t / t1);
         theta_dot_ref = theta_fwd_rad / t1;
 
@@ -375,13 +377,19 @@ void loop() {
 
         // Smoothly return to upright during braking
         const float theta_fwd_rad = 4.0f * (3.14159265f / 180.0f);
-        float alpha = (t_dec_total > 0.0f) ? (1.0f - t_dec / t_dec_total) : 0.0f;
+        // Use smoothstep easing so theta_dot_ref is ~0 at start and end of braking.
+        // This removes the "jerk" from the previous linear alpha + mismatched theta_dot formula.
+        float s = (t_dec_total > 0.0f) ? (t_dec / t_dec_total) : 0.0f;  // 0..1 over braking
+        if (s < 0.0f) s = 0.0f;
+        if (s > 1.0f) s = 1.0f;
 
-        if (alpha < 0.0f) alpha = 0.0f;
-        if (alpha > 1.0f) alpha = 1.0f;
+        // smoothstep: 0->1 with zero slope at both ends
+        float beta = s * s * (3.0f - 2.0f * s);
+        float alpha = 1.0f - beta; // 1->0
 
         theta_ref = theta_fwd_rad * alpha;
-        theta_dot_ref = (theta_fwd_rad * (alpha - 1.0f)) / (t_dec_total > 0.0f ? t_dec_total : 1.0f);
+        float d_alpha_ds = -6.0f * s * (1.0f - s); // d/ds of (1 - smoothstep)
+        theta_dot_ref = (t_dec_total > 0.0f) ? (theta_fwd_rad * d_alpha_ds / t_dec_total) : 0.0f;
       }
     }
   } else {
