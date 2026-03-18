@@ -51,7 +51,7 @@ def calculate_lqr_gains():
     theta_dot_max = np.radians(30.0)  # [rad/s]
     
     # Pole Placement real-value
-    pole_real = -0.996
+    pole_real = -1.05
 
     F_max         = M_t * g           # [N] reference force
     R_multipler = 1.0  # Reduce R to increase control effort and speed up response (at the cost of more overshoot)

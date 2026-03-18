@@ -13,10 +13,10 @@
 
 LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
-LQRController pole_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
+LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
 
 LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
-LQRController pole_sprint(-104.233f, -133.108f, -791.137f, -120.852f);
+LQRController pole_sprint(-111.100f, -140.426f, -800.810f, -124.891f);
 // LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 // LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
