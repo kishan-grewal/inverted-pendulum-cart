@@ -6,7 +6,7 @@
 #define MOTOR_KP 2000.0
 #define MOTOR_KI 1000.0
 #define MOTOR_KD 10.0 // 20.0
-#define INTEGRAL_LIMIT 300.0
+#define INTEGRAL_LIMIT 100.0
 
 int16_t compute_pid_front_left(float desired_speed, float actual_speed, float dt);
 int16_t compute_pid_front_right(float desired_speed, float actual_speed, float dt);

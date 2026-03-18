@@ -51,7 +51,7 @@ class LocalisationKalman {
 
     // Process noise (diagonal): [x, v, theta, theta_v]
     // Increase Q[1] so velocity estimate tracks actual better (less sluggish, less attenuation)
-    float Q[4] = {0.001f, 1.0f, 0.0001f, 0.01f};
+    float Q[4] = {0.001f, 1.0f, 0.0001f, 0.001f};
 
     // Measurement noise
     float R_cart     = 0.05f;   // per wheel encoder [m]

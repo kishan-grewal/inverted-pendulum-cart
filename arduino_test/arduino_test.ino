@@ -64,6 +64,9 @@ float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 
 #define AVG_SIZE 10
 
+const float DEADBAND_LIMIT = 1.0f;
+const float DEADBAND_COMPENSATION = 30.0f;
+
 float dt = 0.0f;
 unsigned long last_loop_time = 0;
 
@@ -495,10 +498,10 @@ void loop() {
   int16_t pid_br = compute_pid_back_right (desired_speed, speeds[3], dt);
 
   // Deadband compensation
-  if (pid_fl > 5) pid_fl += 30; else if (pid_fl < -5) pid_fl -= 30;
-  if (pid_fr > 5) pid_fr += 30; else if (pid_fr < -5) pid_fr -= 30;
-  if (pid_bl > 5) pid_bl += 30; else if (pid_bl < -5) pid_bl -= 30;
-  if (pid_br > 5) pid_br += 30; else if (pid_br < -5) pid_br -= 30;
+  if (pid_fl > DEADBAND_LIMIT) pid_fl += DEADBAND_COMPENSATION; else if (pid_fl < -DEADBAND_LIMIT) pid_fl -= DEADBAND_COMPENSATION;
+  if (pid_fr > DEADBAND_LIMIT) pid_fr += DEADBAND_COMPENSATION; else if (pid_fr < -DEADBAND_LIMIT) pid_fr -= DEADBAND_COMPENSATION;
+  if (pid_bl > DEADBAND_LIMIT) pid_bl += DEADBAND_COMPENSATION; else if (pid_bl < -DEADBAND_LIMIT) pid_bl -= DEADBAND_COMPENSATION;
+  if (pid_br > DEADBAND_LIMIT) pid_br += DEADBAND_COMPENSATION; else if (pid_br < -DEADBAND_LIMIT) pid_br -= DEADBAND_COMPENSATION;
 
   set_motor_speeds(pid_fl, pid_fr, pid_bl, pid_br);
 
