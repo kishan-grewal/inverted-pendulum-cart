@@ -56,6 +56,11 @@ float sprint_t_accel  = 0.0f;  // duration of accel phase  [s]
 float sprint_t_cruise = 0.0f;  // duration of cruise phase [s]
 float sprint_t_total  = 0.0f;  // total sprint duration    [s]
 
+// Sprint reference shaping:
+// Keep pendulum upright references (no leaning angle), and move x_ref with a
+// linear ramp over a slower duration than the original profile.
+const float SPRINT_LINEAR_V_SCALE = 0.5f;  // <1 => slower cart motion
+
 // Sprint state
 bool sprint_active   = false;
 float sprint_x_start  = 0.0f;
@@ -330,67 +335,33 @@ void loop() {
 
     float t = (current_time - start_time_us) / 1000000.0f;  // [s] since sprint start
 
-    if (t >= sprint_t_total) {
-      // Sprint finished: stabilise about hard-coded origin (x = 0)
-      x_ref = SPRINT_DISTANCE_M;
+    const float dir = (SPRINT_DISTANCE_M >= 0.0f) ? 1.0f : -1.0f;
+    const float D_abs = fabsf(SPRINT_DISTANCE_M);
+
+    float v_scale = SPRINT_LINEAR_V_SCALE;
+    if (v_scale <= 0.0f) v_scale = 1.0f;
+
+    // Slow down the overall ramp so the cart increments more safely.
+    // sprint_t_total is based on the original trapezoid (accelerate/cruise/decel).
+    // We stretch time by 1/v_scale so v_ref is reduced by v_scale.
+    float t_total_linear = (sprint_t_total > 0.0f) ? (sprint_t_total / v_scale) : 0.0f;
+
+    theta_ref = 0.0f;
+    theta_dot_ref = 0.0f;
+
+    if (t_total_linear <= 0.0f || t >= t_total_linear) {
+      // Sprint finished: hold final position with upright references.
+      x_ref = sprint_x_start + dir * D_abs;
       xdot_ref = 0.0f;
-      theta_ref = 0.0f;
-      theta_dot_ref = 0.0f;
       sprint_active = false;
     } else {
-      const float t1 = sprint_t_accel;
-      const float t2 = sprint_t_accel + sprint_t_cruise;
-      const float a  = SPRINT_A_MAX;
-      const float vm = SPRINT_V_MAX;
-      const float dir = (SPRINT_DISTANCE_M >= 0.0f) ? 1.0f : -1.0f;
+      float s = t / t_total_linear;  // 0..1
+      if (s < 0.0f) s = 0.0f;
+      if (s > 1.0f) s = 1.0f;
 
-      if (t < t1) {
-        // Acceleration phase
-        xdot_ref = dir * (a * t);
-        x_ref = sprint_x_start + dir * (0.5f * a * t * t);
-
-        // Small forward lean during acceleration
-        const float theta_fwd_rad = 8.0f * (3.14159265f / 180.0f);  // 5 degrees
-        theta_ref = theta_fwd_rad * (t / t1);
-        theta_dot_ref = theta_fwd_rad / t1;
-
-      } else if (t < t2) {
-        // Cruise phase (if any)
-        xdot_ref = dir * vm;
-        float d_accel = 0.5f * a * t1 * t1;
-
-        x_ref = sprint_x_start + dir * (d_accel + vm * (t - t1));
-        theta_ref = 0.0f;
-        theta_dot_ref = 0.0f;
-      } else {
-        // Deceleration phase
-        float t_dec = t - t2;
-        float t_dec_total = sprint_t_total - t2;
-
-        // Mirror of acceleration, coming to rest at D
-        float d_accel = 0.5f * a * t1 * t1;
-        float d_cruise = vm * sprint_t_cruise;
-        float d_before_dec = d_accel + d_cruise;
-
-        xdot_ref = dir * (vm - a * t_dec);
-        x_ref = sprint_x_start + dir * (d_before_dec + vm * t_dec - 0.5f * a * t_dec * t_dec);
-
-        // Smoothly return to upright during braking
-        const float theta_fwd_rad = 4.0f * (3.14159265f / 180.0f);
-        // Use smoothstep easing so theta_dot_ref is ~0 at start and end of braking.
-        // This removes the "jerk" from the previous linear alpha + mismatched theta_dot formula.
-        float s = (t_dec_total > 0.0f) ? (t_dec / t_dec_total) : 0.0f;  // 0..1 over braking
-        if (s < 0.0f) s = 0.0f;
-        if (s > 1.0f) s = 1.0f;
-
-        // smoothstep: 0->1 with zero slope at both ends
-        float beta = s * s * (3.0f - 2.0f * s);
-        float alpha = 1.0f - beta; // 1->0
-
-        theta_ref = theta_fwd_rad * alpha;
-        float d_alpha_ds = -6.0f * s * (1.0f - s); // d/ds of (1 - smoothstep)
-        theta_dot_ref = (t_dec_total > 0.0f) ? (theta_fwd_rad * d_alpha_ds / t_dec_total) : 0.0f;
-      }
+      // Linear x_ref ramp; constant xdot_ref.
+      x_ref = sprint_x_start + dir * D_abs * s;
+      xdot_ref = (dir * D_abs) / t_total_linear;
     }
   } else {
     // Stabilisation task: stabilise about hard-coded origin (x = 0)
