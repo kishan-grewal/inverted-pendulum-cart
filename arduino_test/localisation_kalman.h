@@ -20,7 +20,7 @@ class LocalisationKalman {
     };
 
     // Physical parameters (from dynamics.py)
-    static constexpr float M_cart_total  = 1.515f;
+    static constexpr float M_cart_total  = 1.593f;
     static constexpr float m_rod   = 0.043f;
     static constexpr float m_tip   = 0.050f;
     static constexpr float M_cart  = M_cart_total - m_rod - m_tip; //0.828
@@ -51,7 +51,7 @@ class LocalisationKalman {
 
     // Process noise (diagonal): [x, v, theta, theta_v]
     // Increase Q[1] so velocity estimate tracks actual better (less sluggish, less attenuation)
-    float Q[4] = {0.001f, 0.5f, 0.0001f, 0.01f};
+    float Q[4] = {0.001f, 1.0f, 0.0001f, 0.01f};
 
     // Measurement noise
     float R_cart     = 0.05f;   // per wheel encoder [m]
