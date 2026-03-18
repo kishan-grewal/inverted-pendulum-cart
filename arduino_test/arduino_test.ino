@@ -6,15 +6,19 @@
 #include "motor_pid.h"
 #include "lqr.h"
 #include "localisation_kalman.h"
-#include "cascaded_pid.h"
 
-#define START_BUTTON_PIN  10
-#define CONTROL_SELECT_BUTTON_PIN  12
-#define TASK_SELECT_BUTTON_PIN  13
+#define START_BUTTON_PIN 10
+#define CONTROL_SELECT_BUTTON_PIN 12
+#define TASK_SELECT_BUTTON_PIN 13
 
 LocalisationKalman kalman;
-LQRController lqr(-99.081f, -145.698f, -1020.569f, -128.843f);
-LQRController pole(-99.987f, -146.897f, -1021.826f, -129.500f);
+LQRController lqr_stabilise(-99.081f, -145.698f, -1020.569f, -128.843f);
+LQRController pole_stabilise(-99.987f, -146.897f, -1021.826f, -129.500f);
+
+LQRController lqr_sprint(-99.081f, -126.538f, -752.271f, -114.871f);
+LQRController pole_sprint(-78.323f, -101.584f, -720.590f, -101.097f);
+
+const float LQR_FORCE_LIMIT = 15.0f; //+- N
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -48,17 +52,8 @@ float sprint_t_cruise = 0.0f;  // duration of cruise phase [s]
 float sprint_t_total  = 0.0f;  // total sprint duration    [s]
 
 // Sprint state
-bool  sprint_active   = false;
+bool sprint_active   = false;
 float sprint_x_start  = 0.0f;
-
-const float PENDULUM_KP = 1.0f;
-const float PENDULUM_KI = 0.00001f;
-const float PENDULUM_KD = 0.001f;
-const float PENDULUM_X_KP = 10.0f;
-const float PENDULUM_X_MAX = 2.0f;
-const float PENDULUM_X_INTEGRAL_LIMIT = 0.2f;
-
-CascadedPID cascaded_pid(PENDULUM_KP, PENDULUM_KI, PENDULUM_KD, PENDULUM_X_KP, PENDULUM_X_MAX, PENDULUM_X_INTEGRAL_LIMIT);
 
 void setup() {
   Serial.begin(250000);
@@ -75,8 +70,10 @@ void setup() {
   motorEncoders_init();
   Serial.println("Motor Encoder initialisation complete.");
 
-  lqr.setOutputLimits(-15.0f, 15.0f);
-  pole.setOutputLimits(-15.0f, 15.0f);
+  lqr_stabilise.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
+  pole_stabilise.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
+  lqr_sprint.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
+  pole_sprint.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
 
   pinMode(START_BUTTON_PIN, INPUT_PULLUP);
   pinMode(CONTROL_SELECT_BUTTON_PIN, INPUT_PULLUP);
@@ -173,9 +170,9 @@ void setup() {
   // Pre-compute sprint timings for trapezoidal/triangular profile
   {
     const float D_signed = SPRINT_DISTANCE_M;
-    const float D        = fabsf(D_signed);   // use magnitude for timing
-    const float a        = SPRINT_A_MAX;
-    const float vm       = SPRINT_V_MAX;
+    const float D = fabsf(D_signed);   // use magnitude for timing
+    const float a = SPRINT_A_MAX;
+    const float vm = SPRINT_V_MAX;
 
     float t_accel = vm / a;
     float d_accel = 0.5f * a * t_accel * t_accel;
@@ -183,16 +180,19 @@ void setup() {
     if (2.0f * d_accel >= D) {
       // Triangular profile: no cruise, reduce peak speed
       t_accel = sqrtf(D / a);
-      sprint_t_accel  = t_accel;
+
+      sprint_t_accel = t_accel;
       sprint_t_cruise = 0.0f;
-      sprint_t_total  = 2.0f * t_accel;
+      sprint_t_total = 2.0f * t_accel;
     } else {
       // Trapezoidal profile with cruise
       float d_cruise = D - 2.0f * d_accel;
       float t_cruise = d_cruise / vm;
-      sprint_t_accel  = t_accel;
+
+      sprint_t_accel = t_accel;
       sprint_t_cruise = t_cruise;
-      sprint_t_total  = 2.0f * t_accel + t_cruise;
+
+      sprint_t_total = 2.0f * t_accel + t_cruise;
     }
   }
 
@@ -206,34 +206,41 @@ void loop() {
   // Pause: 20ms press stops loop. Resume: 200ms hold to continue (then reset time/PIDs to avoid windup).
   if (digitalRead(START_BUTTON_PIN) == LOW) {
     unsigned long pause_start = micros();
+
     while (digitalRead(START_BUTTON_PIN) == LOW) {
       if ((micros() - pause_start) >= 20000) {
         // 20ms held: we're paused. Wait for release, then 200ms hold to continue.
         Serial.println("Paused");
+
         while (digitalRead(START_BUTTON_PIN) == HIGH) {
           delay(5);
         }
+
         unsigned long hold_start = micros();
+
         while (true) {
           if (digitalRead(START_BUTTON_PIN) == HIGH) {
             hold_start = micros();
           } else if ((micros() - hold_start) >= 200000) {
             break;  // 200ms hold to continue
           }
+
           delay(5);
         }
         // Reset time and integrators so no windup on first frame after resume
         reset_motor_pids();
         last_loop_time = micros();
         start_time = last_loop_time;
-        cascaded_pid.reset();
         v_target = 0.0f;
         u_prev   = 0.0f;
+
         Serial.println("Resumed");
+
         // Wait for release so next loop() iteration doesn't re-enter pause
         while (digitalRead(START_BUTTON_PIN) == LOW) {
           delay(5);
         }
+
         break;
       }
     }
@@ -254,8 +261,8 @@ void loop() {
   float d1, d2, d3, d4;
   encoders_getDistance(&d1, &d2, &d3, &d4);
 
-  static float prev_d[4]         = {0, 0, 0, 0};
-  float dists[4]                  = {d1, d2, d3, d4};
+  static float prev_d[4] = {0, 0, 0, 0};
+  float dists[4] = {d1, d2, d3, d4};
   float speeds[4];
 
   static float speed_buf[4][AVG_SIZE] = {};
@@ -301,9 +308,9 @@ void loop() {
   current_time = micros();
 
   // Compute sprint reference trajectory (position & velocity) and pendulum lean
-  float x_ref        = 0.0f;
-  float xdot_ref     = 0.0f;
-  float theta_ref    = 0.0f;
+  float x_ref = 0.0f;
+  float xdot_ref = 0.0f;
+  float theta_ref = 0.0f;
   float theta_dot_ref = 0.0f;
 
   if (task_mode == 1) {
@@ -318,9 +325,9 @@ void loop() {
 
     if (t >= sprint_t_total) {
       // Sprint finished: stabilise about hard-coded origin (x = 0)
-      x_ref         = 0.0f;
-      xdot_ref      = 0.0f;
-      theta_ref     = 0.0f;
+      x_ref = SPRINT_DISTANCE_M;
+      xdot_ref = 0.0f;
+      theta_ref = 0.0f;
       theta_dot_ref = 0.0f;
       sprint_active = false;
     } else {
@@ -333,37 +340,42 @@ void loop() {
       if (t < t1) {
         // Acceleration phase
         xdot_ref = dir * (a * t);
-        x_ref    = sprint_x_start + dir * (0.5f * a * t * t);
+        x_ref = sprint_x_start + dir * (0.5f * a * t * t);
+
         // Small forward lean during acceleration
         const float theta_fwd_rad = 7.0f * (3.14159265f / 180.0f);  // 5 degrees
-        theta_ref     = theta_fwd_rad * (t / t1);
+        theta_ref = theta_fwd_rad * (t / t1);
         theta_dot_ref = theta_fwd_rad / t1;
+
       } else if (t < t2) {
         // Cruise phase (if any)
         xdot_ref = dir * vm;
         float d_accel = 0.5f * a * t1 * t1;
-        x_ref    = sprint_x_start + dir * (d_accel + vm * (t - t1));
-        theta_ref     = 0.0f;
+
+        x_ref = sprint_x_start + dir * (d_accel + vm * (t - t1));
+        theta_ref = 0.0f;
         theta_dot_ref = 0.0f;
       } else {
         // Deceleration phase
-        float t_dec       = t - t2;
+        float t_dec = t - t2;
         float t_dec_total = sprint_t_total - t2;
 
         // Mirror of acceleration, coming to rest at D
-        float d_accel      = 0.5f * a * t1 * t1;
-        float d_cruise     = vm * sprint_t_cruise;
+        float d_accel = 0.5f * a * t1 * t1;
+        float d_cruise = vm * sprint_t_cruise;
         float d_before_dec = d_accel + d_cruise;
 
         xdot_ref = dir * (vm - a * t_dec);
-        x_ref    = sprint_x_start + dir * (d_before_dec + vm * t_dec - 0.5f * a * t_dec * t_dec);
+        x_ref = sprint_x_start + dir * (d_before_dec + vm * t_dec - 0.5f * a * t_dec * t_dec);
 
         // Smoothly return to upright during braking
-        const float theta_fwd_rad = 5.0f * (3.14159265f / 180.0f);
+        const float theta_fwd_rad = 4.0f * (3.14159265f / 180.0f);
         float alpha = (t_dec_total > 0.0f) ? (1.0f - t_dec / t_dec_total) : 0.0f;
+
         if (alpha < 0.0f) alpha = 0.0f;
         if (alpha > 1.0f) alpha = 1.0f;
-        theta_ref     = theta_fwd_rad * alpha;
+
+        theta_ref = theta_fwd_rad * alpha;
         theta_dot_ref = (theta_fwd_rad * (alpha - 1.0f)) / (t_dec_total > 0.0f ? t_dec_total : 1.0f);
       }
     }
@@ -385,16 +397,26 @@ void loop() {
 
   const float M_TOTAL = 1.515f;
 
-  if (control_mode == 0) {
-    lqr_force = lqr.compute(state, target);
+  if (task_mode == 0) {
+    if (control_mode == 0) {
+      lqr_force = lqr_stabilise.compute(state, target);
+    }
+    else {
+      lqr_force = pole_stabilise.compute(state, target);
+    }
   }
   else {
-    lqr_force = pole.compute(state, target);
+    if (control_mode == 0) {
+      lqr_force = lqr_sprint.compute(state, target);
+    }
+    else {
+      lqr_force = pole_sprint.compute(state, target);
+    }
   }
 
   v_target += (lqr_force / M_TOTAL) * dt;
-  v_target  = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
-  u_prev    = lqr_force;
+  v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
+  u_prev = lqr_force;
 
   desired_speed = v_target;
 
