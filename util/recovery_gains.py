@@ -48,7 +48,7 @@ def calculate_lqr_gains():
     x_max         = 0.15              # [m]
     x_dot_max     = 1.5               # [m/s]
     theta_max     = np.radians(1.0)   # [rad]
-    theta_dot_max = np.radians(30.0)  # [rad/s]
+    theta_dot_max = np.radians(90.0)  # [rad/s]
     
     # Pole Placement real-value
     pole_real = -0.8
