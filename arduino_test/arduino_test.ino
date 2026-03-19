@@ -15,12 +15,18 @@ LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
 
+LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
+LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
+
 LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 LQRController pole_sprint(-111.100f, -140.426f, -800.810f, -124.891f);
 // LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 // LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
 const float LQR_FORCE_LIMIT = 15.627f; //+- N
+const float LQR_FORCE_LIMIT_RECOVERY = 15.627f; //+- N
+
+const float RECOVERY_SWITCH_ANGLE_DEG = 3.0f;
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -83,6 +89,8 @@ void setup() {
 
   lqr_stabilise.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
   pole_stabilise.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
+  lqr_recovery.setOutputLimits(-LQR_FORCE_LIMIT_RECOVERY, LQR_FORCE_LIMIT_RECOVERY);
+  pole_recovery.setOutputLimits(-LQR_FORCE_LIMIT_RECOVERY, LQR_FORCE_LIMIT_RECOVERY);
   lqr_sprint.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
   pole_sprint.setOutputLimits(-LQR_FORCE_LIMIT, LQR_FORCE_LIMIT);
 
@@ -146,7 +154,7 @@ void setup() {
         task_mode = task_mode + 1;
         task_mode_changed = true;
 
-        if (task_mode > 1) {
+        if (task_mode > 2) {
           task_mode = 0;
         }
 
@@ -159,6 +167,10 @@ void setup() {
 
           case 1:
             Serial.println("Sprint");
+            break;
+
+          case 2:
+            Serial.println("Recovery");
             break;
 
           default:
@@ -395,12 +407,29 @@ void loop() {
       lqr_force = pole_stabilise.compute(state, target);
     }
   }
-  else {
+  else if (task_mode == 1) {
     if (control_mode == 0) {
       lqr_force = lqr_sprint.compute(state, target);
     }
     else {
       lqr_force = pole_sprint.compute(state, target);
+    }
+  }
+  else if (task_mode == 2) {
+    if (fabsf(kalman.getTheta()) > RECOVERY_SWITCH_ANGLE_DEG) {
+      if (control_mode == 0) {
+        lqr_force = lqr_recovery.compute(state, target);
+      }
+      else {
+        lqr_force = pole_recovery.compute(state, target);
+      }
+    } else {
+      if (control_mode == 0) {
+        lqr_force = lqr_stabilise.compute(state, target);
+      }
+      else {
+        lqr_force = pole_stabilise.compute(state, target);
+      }
     }
   }
 
