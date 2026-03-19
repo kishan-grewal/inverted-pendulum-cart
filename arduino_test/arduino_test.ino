@@ -11,12 +11,14 @@
 #define CONTROL_SELECT_BUTTON_PIN 12
 #define TASK_SELECT_BUTTON_PIN 13
 
+const float DEG_TO_RAD = 3.14159265f / 180.0f;
+const float RAD_TO_DEG = 180.0f / 3.14159265f;
+
 LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
 LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
-
-LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
-LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
+LQRController lqr_recovery(-104.182f, -153.199f, -1073.178f, -135.522f);
+LQRController pole_recovery(-105.135f, -154.459f, -1074.500f, -136.213f);
 
 LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 LQRController pole_sprint(-111.100f, -140.426f, -800.810f, -124.891f);
@@ -27,6 +29,21 @@ const float LQR_FORCE_LIMIT = 15.627f; //+- N
 const float LQR_FORCE_LIMIT_RECOVERY = 15.627f; //+- N
 
 const float RECOVERY_SWITCH_ANGLE_DEG = 3.0f;
+const float RECOVERY_SWITCH_ANGLE_RAD = RECOVERY_SWITCH_ANGLE_DEG * DEG_TO_RAD;
+
+// Recovery test mode:
+// When enabled in task mode 2, the cart applies one open-loop motor command
+// based on theta's sign, then waits for the pendulum to drift back inside the
+// +/- RECOVERY_SWITCH_ANGLE_DEG capture window before handing over to the
+// normal stabilise controller.
+const bool ENABLE_OPEN_LOOP_RECOVERY_TEST = true;
+const int16_t RECOVERY_TEST_MOTOR_SPEED = 800;
+const unsigned long RECOVERY_TEST_DURATION_MS = 120UL;
+
+// Positive theta means the pendulum is leaning to the right. By default we
+// command a positive motor speed in that case. Flip this if the hardware moves
+// the wrong way during the recovery pulse test.
+const bool RECOVERY_TEST_INVERT_DIRECTION = false;
 
 float pendulum_encoder_angle = 0.0f;  // degrees, for Serial/display
 #define CALIBRATION_OFFSET_DEG (0.0f)
@@ -46,7 +63,7 @@ static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
 int control_mode = 0; // 0 = LQR, 1 = POLE
-int task_mode = 0; //0 = stabilisation, 1 = sprint
+int task_mode = 0; // 0 = stabilisation, 1 = sprint, 2 = recovery
 
 unsigned long start_time_us = 0;
 float x_final = 0.0f;
@@ -71,6 +88,28 @@ const float SPRINT_LINEAR_V_SCALE = 0.5f;  // <1 => slower cart motion
 bool sprint_active   = false;
 float sprint_x_start  = 0.0f;
 bool sprint_completed = false;
+
+bool recovery_test_pulse_active = false;
+bool recovery_test_pulse_done = false;
+unsigned long recovery_test_pulse_start_us = 0;
+int16_t recovery_test_motor_command = 0;
+
+void reset_recovery_test_state() {
+  recovery_test_pulse_active = false;
+  recovery_test_pulse_done = false;
+  recovery_test_pulse_start_us = 0;
+  recovery_test_motor_command = 0;
+}
+
+int16_t get_recovery_test_motor_command(float theta_rad) {
+  int16_t motor_command = (theta_rad >= 0.0f) ? RECOVERY_TEST_MOTOR_SPEED : -RECOVERY_TEST_MOTOR_SPEED;
+
+  if (RECOVERY_TEST_INVERT_DIRECTION) {
+    motor_command = -motor_command;
+  }
+
+  return motor_command;
+}
 
 void setup() {
   Serial.begin(250000);
@@ -258,6 +297,7 @@ void loop() {
         u_prev   = 0.0f;
         sprint_active = false;
         sprint_completed = false;
+        reset_recovery_test_state();
 
         Serial.println("Resumed");
 
@@ -273,8 +313,8 @@ void loop() {
 
   
   // Unwrapped radians from encoder; apply calibration
-  float angle_rad = get_pendulum_angle_rad() + (CALIBRATION_OFFSET_DEG * (3.14159265f / 180.0f));
-  pendulum_encoder_angle = angle_rad * (180.0f / 3.14159265f);  // degrees for Serial/display
+  float angle_rad = get_pendulum_angle_rad() + (CALIBRATION_OFFSET_DEG * DEG_TO_RAD);
+  pendulum_encoder_angle = angle_rad * RAD_TO_DEG;  // degrees for Serial/display
 
   // Timing
   unsigned long current_time = micros();
@@ -318,6 +358,7 @@ void loop() {
     reset_motor_pids();
     sprint_active = false;
     sprint_completed = false;
+    reset_recovery_test_state();
     return;
   }
 
@@ -398,32 +439,58 @@ void loop() {
   float target[4] = { x_ref, xdot_ref, theta_ref, theta_dot_ref };
 
   const float M_TOTAL = 1.593f;
+  bool recovery_test_bypassing_closed_loop = false;
+  bool recovery_test_waiting_for_capture = false;
+  int16_t open_loop_motor_command = 0;
 
-  if (task_mode == 0) {
-    if (control_mode == 0) {
-      lqr_force = lqr_stabilise.compute(state, target);
-    }
-    else {
-      lqr_force = pole_stabilise.compute(state, target);
-    }
-  }
-  else if (task_mode == 1) {
-    if (control_mode == 0) {
-      lqr_force = lqr_sprint.compute(state, target);
-    }
-    else {
-      lqr_force = pole_sprint.compute(state, target);
-    }
-  }
-  else if (task_mode == 2) {
-    if (fabsf(kalman.getTheta()) > RECOVERY_SWITCH_ANGLE_DEG) {
-      if (control_mode == 0) {
-        lqr_force = lqr_recovery.compute(state, target);
+  if (task_mode == 2 && ENABLE_OPEN_LOOP_RECOVERY_TEST) {
+    const float theta_abs_rad = fabsf(kalman.getTheta());
+
+    if (theta_abs_rad > RECOVERY_SWITCH_ANGLE_RAD) {
+      if (!recovery_test_pulse_done) {
+        if (!recovery_test_pulse_active) {
+          recovery_test_pulse_active = true;
+          recovery_test_pulse_start_us = current_time;
+          recovery_test_motor_command = get_recovery_test_motor_command(kalman.getTheta());
+
+          Serial.print("Recovery pulse started at motor speed ");
+          Serial.println(recovery_test_motor_command);
+        }
+
+        const unsigned long recovery_test_elapsed_us = current_time - recovery_test_pulse_start_us;
+        const unsigned long recovery_test_duration_us = RECOVERY_TEST_DURATION_MS * 1000UL;
+
+        if (recovery_test_elapsed_us < recovery_test_duration_us) {
+          recovery_test_bypassing_closed_loop = true;
+          open_loop_motor_command = recovery_test_motor_command;
+        } else {
+          recovery_test_pulse_active = false;
+          recovery_test_pulse_done = true;
+          recovery_test_motor_command = 0;
+          Serial.println("Recovery pulse finished. Waiting to re-enter stabilise window.");
+        }
       }
-      else {
-        lqr_force = pole_recovery.compute(state, target);
+
+      if (recovery_test_pulse_done) {
+        recovery_test_bypassing_closed_loop = true;
+        recovery_test_waiting_for_capture = true;
+        open_loop_motor_command = 0;
       }
-    } else {
+    } else if (recovery_test_pulse_active || recovery_test_pulse_done) {
+      Serial.println("Recovery angle back inside capture window. Switching to stabilise controller.");
+      reset_recovery_test_state();
+    }
+  } else {
+    reset_recovery_test_state();
+  }
+
+  int16_t pid_fl = 0;
+  int16_t pid_fr = 0;
+  int16_t pid_bl = 0;
+  int16_t pid_br = 0;
+
+  if (!recovery_test_bypassing_closed_loop) {
+    if (task_mode == 0) {
       if (control_mode == 0) {
         lqr_force = lqr_stabilise.compute(state, target);
       }
@@ -431,27 +498,61 @@ void loop() {
         lqr_force = pole_stabilise.compute(state, target);
       }
     }
+    else if (task_mode == 1) {
+      if (control_mode == 0) {
+        lqr_force = lqr_sprint.compute(state, target);
+      }
+      else {
+        lqr_force = pole_sprint.compute(state, target);
+      }
+    }
+    else if (task_mode == 2) {
+      if (!ENABLE_OPEN_LOOP_RECOVERY_TEST && fabsf(kalman.getTheta()) > RECOVERY_SWITCH_ANGLE_RAD) {
+        if (control_mode == 0) {
+          lqr_force = lqr_recovery.compute(state, target);
+        }
+        else {
+          lqr_force = pole_recovery.compute(state, target);
+        }
+      } else {
+        if (control_mode == 0) {
+          lqr_force = lqr_stabilise.compute(state, target);
+        }
+        else {
+          lqr_force = pole_stabilise.compute(state, target);
+        }
+      }
+    }
+
+    v_target += (lqr_force / M_TOTAL) * dt;
+    v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
+    u_prev = lqr_force;
+
+    desired_speed = v_target;
+
+    // Motor PIDs
+    pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
+    pid_fr = compute_pid_front_right(desired_speed, speeds[1], dt);
+    pid_bl = compute_pid_back_left  (desired_speed, speeds[2], dt);
+    pid_br = compute_pid_back_right (desired_speed, speeds[3], dt);
+
+    // Deadband compensation
+    if (pid_fl > DEADBAND_LIMIT) pid_fl += DEADBAND_COMPENSATION; else if (pid_fl < -DEADBAND_LIMIT) pid_fl -= DEADBAND_COMPENSATION;
+    if (pid_fr > DEADBAND_LIMIT) pid_fr += DEADBAND_COMPENSATION; else if (pid_fr < -DEADBAND_LIMIT) pid_fr -= DEADBAND_COMPENSATION;
+    if (pid_bl > DEADBAND_LIMIT) pid_bl += DEADBAND_COMPENSATION; else if (pid_bl < -DEADBAND_LIMIT) pid_bl -= DEADBAND_COMPENSATION;
+    if (pid_br > DEADBAND_LIMIT) pid_br += DEADBAND_COMPENSATION; else if (pid_br < -DEADBAND_LIMIT) pid_br -= DEADBAND_COMPENSATION;
+
+    set_motor_speeds(pid_fl, pid_fr, pid_bl, pid_br);
+  } else {
+    // The recovery pulse bypasses the speed PIDs on purpose so you can test a
+    // single fixed motor command before handing back to the stabilise LQR.
+    desired_speed = 0.0f;
+    lqr_force = 0.0f;
+    v_target = 0.0f;
+    u_prev = 0.0f;
+    reset_motor_pids();
+    set_motor_speed(open_loop_motor_command);
   }
-
-  v_target += (lqr_force / M_TOTAL) * dt;
-  v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
-  u_prev = lqr_force;
-
-  desired_speed = v_target;
-
-  // Motor PIDs
-  int16_t pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
-  int16_t pid_fr = compute_pid_front_right(desired_speed, speeds[1], dt);
-  int16_t pid_bl = compute_pid_back_left  (desired_speed, speeds[2], dt);
-  int16_t pid_br = compute_pid_back_right (desired_speed, speeds[3], dt);
-
-  // Deadband compensation
-  if (pid_fl > DEADBAND_LIMIT) pid_fl += DEADBAND_COMPENSATION; else if (pid_fl < -DEADBAND_LIMIT) pid_fl -= DEADBAND_COMPENSATION;
-  if (pid_fr > DEADBAND_LIMIT) pid_fr += DEADBAND_COMPENSATION; else if (pid_fr < -DEADBAND_LIMIT) pid_fr -= DEADBAND_COMPENSATION;
-  if (pid_bl > DEADBAND_LIMIT) pid_bl += DEADBAND_COMPENSATION; else if (pid_bl < -DEADBAND_LIMIT) pid_bl -= DEADBAND_COMPENSATION;
-  if (pid_br > DEADBAND_LIMIT) pid_br += DEADBAND_COMPENSATION; else if (pid_br < -DEADBAND_LIMIT) pid_br -= DEADBAND_COMPENSATION;
-
-  set_motor_speeds(pid_fl, pid_fr, pid_bl, pid_br);
 
   // Serial (teleplot, throttled 100ms)
   static unsigned long last_print = 0;
@@ -477,8 +578,12 @@ void loop() {
     Serial.println(">kalman_v:"           + String(estimated_velocity, 3));
     Serial.println(">kalman_x:"           + String(estimated_position, 3));
     Serial.println(">x_ref:"              + String(x_ref,              3));
-    Serial.println(">theta_ref:"          + String(theta_ref * (180.0f / 3.14159265f), 3));
+    Serial.println(">theta_ref:"          + String(theta_ref * RAD_TO_DEG, 3));
     Serial.println(">sprint_active:"      + String(sprint_active ? 1 : 0));
+    Serial.println(">recovery_test_enabled:" + String(ENABLE_OPEN_LOOP_RECOVERY_TEST ? 1 : 0));
+    Serial.println(">recovery_test_active:"  + String(recovery_test_pulse_active ? 1 : 0));
+    Serial.println(">recovery_test_waiting:" + String(recovery_test_waiting_for_capture ? 1 : 0));
+    Serial.println(">recovery_test_cmd:"     + String(open_loop_motor_command));
     Serial.println(">pwm:"                + String((float)pid_fl / 1000.0f, 3));
     Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,          3));
     Serial.println("---");
