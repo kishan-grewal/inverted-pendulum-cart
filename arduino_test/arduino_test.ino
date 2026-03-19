@@ -47,9 +47,9 @@ float x_final = 0.0f;
 float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
-const float SPRINT_DISTANCE_M = 2.0f;
+const float SPRINT_DISTANCE_M = 2.01f;
 const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
-const float SPRINT_V_MAX      = 0.175f;  // [m/s]   conservative cruise speed
+const float SPRINT_V_MAX      = 1.5f;  // [m/s]   conservative cruise speed
 
 // Derived sprint timing (computed in setup)
 float sprint_t_accel  = 0.0f;  // duration of accel phase  [s]
