@@ -13,7 +13,7 @@
 
 LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
-LQRController pole_stabilise(-105.135f, -154.459f, -1074.500f, -136.213f);
+LQRController pole_stabilise(-107.365f, -157.371f, -1077.569f, -137.809f);
 
 LQRController lqr_recovery(-104.182f, -148.581f, -1048.494f, -121.565f);
 LQRController pole_recovery(-107.113f, -152.454f, -1052.127f, -123.688f);
