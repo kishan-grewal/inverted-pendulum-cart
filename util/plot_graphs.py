@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 def _default_csv_path() -> str:
     # Default to the recording that the user referenced.
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "recordings", "eval_c_pole.csv")
+    return os.path.join(script_dir, "recordings", "eval_c_lqr.csv")
 
 
 def load_csv(csv_path: str) -> Tuple[List[float], List[float], List[float], List[float]]:
