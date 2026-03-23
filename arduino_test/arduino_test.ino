@@ -460,7 +460,7 @@ void loop() {
   dt_sum += dt * 1000.0f;
   dt_n++;
 
-  if (current_time - last_print >= 100000) {
+  if (current_time - last_print >= 10000) {
     last_print = current_time;
     float dt_cumavg = dt_sum / dt_n;
     Serial.println(">motor_encoders(FL, FR, BL, BR):"     + String(d1,                 3) + "," + String(d2,                 3) + "," + String(d3,                 3) + "," + String(d4,                 3));
