@@ -53,7 +53,7 @@ float x_final = 0.0f;
 float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
-const float SPRINT_DISTANCE_M = 2.01f;
+const float SPRINT_DISTANCE_M = 2.05f;
 const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
 const float SPRINT_V_MAX      = 2.5f;  // [m/s]   conservative cruise speed
 
@@ -65,7 +65,7 @@ float sprint_t_total  = 0.0f;  // total sprint duration    [s]
 // Sprint reference shaping:
 // Keep pendulum upright references (no leaning angle), and move x_ref with a
 // linear ramp over a slower duration than the original profile.
-const float SPRINT_LINEAR_V_SCALE = 0.5f;  // <1 => slower cart motion
+const float SPRINT_LINEAR_V_SCALE = 0.8f;  // <1 => slower cart motion
 
 // Sprint state
 bool sprint_active   = false;
