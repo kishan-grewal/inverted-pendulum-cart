@@ -46,7 +46,7 @@ static float v_target = 0.0f;
 static float u_prev   = 0.0f;
 
 int control_mode = 0; // 0 = LQR, 1 = POLE
-int task_mode = 0; //0 = stabilisation, 1 = sprint
+int task_mode = 0; //0 = stabilisation, 1 = sprint, 2 = recovery, 3 = arc turn
 
 unsigned long start_time_us = 0;
 float x_final = 0.0f;
@@ -71,6 +71,20 @@ const float SPRINT_LINEAR_V_SCALE = 0.8f;  // <1 => slower cart motion
 bool sprint_active   = false;
 float sprint_x_start  = 0.0f;
 bool sprint_completed = false;
+
+// Arc-turn parameters and state (90-degree turn while balancing)
+const float ARC_TURN_DEG         = 90.0f;
+const float ARC_RADIUS_M         = 1.0f;
+const float ARC_TRACK_WIDTH_M    = 0.58f;  // tune with chassis geometry
+const float ARC_LINEAR_SPEED_MPS = 0.35f;  // conservative initial speed
+const float ARC_OMEGA_MAX_RAD_S  = 0.7f;   // limit yaw-rate command
+bool arc_turn_left = true;                 // selectable in setup when task=ArcTurn90
+
+bool arc_active = false;
+bool arc_completed = false;
+float arc_x_start = 0.0f;
+float arc_heading_start = 0.0f;  // [rad]
+float arc_heading_est = 0.0f;    // [rad]
 
 void setup() {
   Serial.begin(250000);
@@ -119,27 +133,35 @@ void setup() {
 
       // wait for 200ms button press before changing control mode
       if ((micros() - start_time_us > 200000) && !control_mode_changed) {
-        control_mode = control_mode + 1;
-        control_mode_changed = true;
+        // In arc-turn task, use control-select button to toggle turn direction.
+        if (task_mode == 3) {
+          arc_turn_left = !arc_turn_left;
+          control_mode_changed = true;
+          Serial.print("Arc turn direction: ");
+          Serial.println(arc_turn_left ? "Left" : "Right");
+        } else {
+          control_mode = control_mode + 1;
+          control_mode_changed = true;
 
-        if (control_mode > 1) {
-          control_mode = 0;
-        }
+          if (control_mode > 1) {
+            control_mode = 0;
+          }
 
-        Serial.print("Control mode: ");
+          Serial.print("Control mode: ");
 
-        switch (control_mode) {
-          case 0:
-            Serial.println("LQR");
-            break;
+          switch (control_mode) {
+            case 0:
+              Serial.println("LQR");
+              break;
 
-          case 1:
-            Serial.println("POLE");
-            break;
+            case 1:
+              Serial.println("POLE");
+              break;
 
-          default:
-            Serial.println("Unknown");
-            break;
+            default:
+              Serial.println("Unknown");
+              break;
+          }
         }
 
         // exit inner loop to reset start time
@@ -154,7 +176,7 @@ void setup() {
         task_mode = task_mode + 1;
         task_mode_changed = true;
 
-        if (task_mode > 2) {
+        if (task_mode > 3) {
           task_mode = 0;
         }
 
@@ -171,6 +193,12 @@ void setup() {
 
           case 2:
             Serial.println("Recovery");
+            break;
+
+          case 3:
+            Serial.print("ArcTurn90 (");
+            Serial.print(arc_turn_left ? "Left" : "Right");
+            Serial.println(")");
             break;
 
           default:
@@ -258,6 +286,9 @@ void loop() {
         u_prev   = 0.0f;
         sprint_active = false;
         sprint_completed = false;
+        arc_active = false;
+        arc_completed = false;
+        arc_heading_start = arc_heading_est;
 
         Serial.println("Resumed");
 
@@ -318,6 +349,9 @@ void loop() {
     reset_motor_pids();
     sprint_active = false;
     sprint_completed = false;
+    arc_active = false;
+    arc_completed = false;
+    arc_heading_start = arc_heading_est;
     return;
   }
 
@@ -328,6 +362,19 @@ void loop() {
 
   float estimated_position = kalman.getPosition();
   float estimated_velocity = kalman.getVelocity();
+
+  // Differential wheel odometry heading estimate
+  static float prev_left_dist = 0.0f;
+  static float prev_right_dist = 0.0f;
+  float left_dist = 0.5f * (d1 + d3);
+  float right_dist = 0.5f * (d2 + d4);
+  float d_left = left_dist - prev_left_dist;
+  float d_right = right_dist - prev_right_dist;
+  prev_left_dist = left_dist;
+  prev_right_dist = right_dist;
+  if (ARC_TRACK_WIDTH_M > 0.0f) {
+    arc_heading_est += (d_right - d_left) / ARC_TRACK_WIDTH_M;
+  }
 
   float desired_speed = 0.0f;
 
@@ -380,6 +427,34 @@ void loop() {
       x_ref = sprint_x_start + dir * D_abs * s;
       xdot_ref = (dir * D_abs) / t_total_linear;
     }
+  } else if (task_mode == 3) {
+    if (!arc_active && !arc_completed) {
+      arc_active = true;
+      arc_x_start = estimated_position;
+      arc_heading_start = arc_heading_est;
+      start_time_us = current_time;
+    }
+
+    const float dir_turn = arc_turn_left ? 1.0f : -1.0f;
+    const float heading_target = ARC_TURN_DEG * (3.14159265f / 180.0f);
+    const float heading_delta = dir_turn * (arc_heading_est - arc_heading_start);
+    float progress = heading_delta / heading_target;
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    const float arc_len = ARC_RADIUS_M * heading_target;
+    x_ref = arc_x_start + arc_len * progress;
+    xdot_ref = (progress >= 1.0f) ? 0.0f : ARC_LINEAR_SPEED_MPS;
+    theta_ref = 0.0f;
+    theta_dot_ref = 0.0f;
+
+    if (progress >= 1.0f) {
+      arc_active = false;
+      arc_completed = true;
+    }
+
+    sprint_active = false;
+    sprint_completed = false;
   } else {
     // Stabilisation task: stabilise about hard-coded origin (x = 0)
     x_ref         = 0.0f;
@@ -388,6 +463,8 @@ void loop() {
     theta_dot_ref = 0.0f;
     sprint_active = false;
     sprint_completed = false;
+    arc_active = false;
+    arc_completed = false;
   }
 
   x_target = x_ref;
@@ -432,6 +509,14 @@ void loop() {
       }
     }
   }
+  else if (task_mode == 3) {
+    if (control_mode == 0) {
+      lqr_force = lqr_sprint.compute(state, target);
+    }
+    else {
+      lqr_force = pole_sprint.compute(state, target);
+    }
+  }
 
   v_target += (lqr_force / M_TOTAL) * dt;
   v_target = constrain(v_target, LQR_VELOCITY_MIN, LQR_VELOCITY_MAX);
@@ -439,11 +524,37 @@ void loop() {
 
   desired_speed = v_target;
 
+  float desired_speed_fl = desired_speed;
+  float desired_speed_fr = desired_speed;
+  float desired_speed_bl = desired_speed;
+  float desired_speed_br = desired_speed;
+
+  if (task_mode == 3) {
+    float radius = ARC_RADIUS_M;
+    if (radius < 0.01f) radius = 0.01f;
+    float omega = desired_speed / radius;
+    omega = constrain(omega, -ARC_OMEGA_MAX_RAD_S, ARC_OMEGA_MAX_RAD_S);
+    float half_track = 0.5f * ARC_TRACK_WIDTH_M;
+    float v_left = desired_speed - omega * half_track;
+    float v_right = desired_speed + omega * half_track;
+
+    if (!arc_turn_left) {
+      float tmp = v_left;
+      v_left = v_right;
+      v_right = tmp;
+    }
+
+    desired_speed_fl = v_left;
+    desired_speed_bl = v_left;
+    desired_speed_fr = v_right;
+    desired_speed_br = v_right;
+  }
+
   // Motor PIDs
-  int16_t pid_fl = compute_pid_front_left (desired_speed, speeds[0], dt);
-  int16_t pid_fr = compute_pid_front_right(desired_speed, speeds[1], dt);
-  int16_t pid_bl = compute_pid_back_left  (desired_speed, speeds[2], dt);
-  int16_t pid_br = compute_pid_back_right (desired_speed, speeds[3], dt);
+  int16_t pid_fl = compute_pid_front_left (desired_speed_fl, speeds[0], dt);
+  int16_t pid_fr = compute_pid_front_right(desired_speed_fr, speeds[1], dt);
+  int16_t pid_bl = compute_pid_back_left  (desired_speed_bl, speeds[2], dt);
+  int16_t pid_br = compute_pid_back_right (desired_speed_br, speeds[3], dt);
 
   // Deadband compensation
   if (pid_fl > DEADBAND_LIMIT) pid_fl += DEADBAND_COMPENSATION; else if (pid_fl < -DEADBAND_LIMIT) pid_fl -= DEADBAND_COMPENSATION;
@@ -479,6 +590,12 @@ void loop() {
     Serial.println(">x_ref:"              + String(x_ref,              3));
     Serial.println(">theta_ref:"          + String(theta_ref * (180.0f / 3.14159265f), 3));
     Serial.println(">sprint_active:"      + String(sprint_active ? 1 : 0));
+    Serial.println(">arc_active:"         + String(arc_active ? 1 : 0));
+    Serial.println(">arc_completed:"      + String(arc_completed ? 1 : 0));
+    Serial.println(">arc_heading_est_deg:"+ String(arc_heading_est * (180.0f / 3.14159265f), 3));
+    Serial.println(">arc_direction_left:" + String(arc_turn_left ? 1 : 0));
+    Serial.println(">desired_left:"       + String(desired_speed_fl, 3));
+    Serial.println(">desired_right:"      + String(desired_speed_fr, 3));
     Serial.println(">pwm:"                + String((float)pid_fl / 1000.0f, 3));
     Serial.println(">dt_cumavg_ms:"       + String(dt_cumavg,          3));
     Serial.println("---");
