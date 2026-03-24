@@ -18,8 +18,8 @@ LQRController pole_stabilise(-107.365f, -157.371f, -1077.569f, -137.809f);
 LQRController lqr_recovery(-104.182f, -148.581f, -1048.494f, -121.565f);
 LQRController pole_recovery(-107.113f, -152.454f, -1052.127f, -123.688f);
 
-LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
-LQRController pole_sprint(-111.100f, -140.426f, -800.810f, -124.891f);
+LQRController lqr_sprint(-104.182f, -153.199f, -1073.178f, -135.522f);
+LQRController pole_sprint(-107.365f, -157.371f, -1077.569f, -137.809f);
 // LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 // LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
@@ -53,7 +53,7 @@ float x_final = 0.0f;
 float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
-const float SPRINT_DISTANCE_M = 2.05f;
+const float SPRINT_DISTANCE_M = 2.06f;
 const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
 const float SPRINT_V_MAX      = 2.5f;  // [m/s]   conservative cruise speed
 
