@@ -20,8 +20,6 @@ The repository contains:
 |-- util/           Offline Python tools and recorded CSV logs
 |-- docs/           Hardware datasheets and modelling notes
 |-- examples/       Extra experimental C++ code
-|-- lib/            Placeholder Arduino library folder
-|-- test/           Placeholder test folder
 ```
 
 Key files inside `arduino_test/`:
