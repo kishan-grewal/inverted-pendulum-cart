@@ -8,6 +8,10 @@ The repository contains:
 - Python utilities in `util/` for calibration, logging, plotting, system identification, and controller gain generation
 - supporting notes and hardware PDFs in `docs/`
 
+<p align="left">
+  <img src="media/disturbance-640p.gif" alt="Inverted Pendulum Disturbance Demo" width="400"/>
+</p>
+
 ## Project structure
 
 ```text
