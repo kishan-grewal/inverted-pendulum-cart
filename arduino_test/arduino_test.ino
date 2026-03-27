@@ -13,13 +13,13 @@
 
 LocalisationKalman kalman;
 LQRController lqr_stabilise(-104.182f, -153.199f, -1073.178f, -135.522f);
-LQRController pole_stabilise(-107.365f, -157.371f, -1077.569f, -137.809f);
+LQRController pole_stabilise(-110.095f, -160.869f, -1081.282f, -139.727f);
 
 LQRController lqr_recovery(-104.182f, -148.581f, -1048.494f, -121.565f);
 LQRController pole_recovery(-107.113f, -152.454f, -1052.127f, -123.688f);
 
 LQRController lqr_sprint(-104.182f, -153.199f, -1073.178f, -135.522f);
-LQRController pole_sprint(-107.365f, -157.371f, -1077.569f, -137.809f);
+LQRController pole_sprint(-110.095f, -160.869f, -1081.282f, -139.727f);
 // LQRController lqr_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 // LQRController pole_sprint(-104.182f, -133.052f, -791.064f, -120.821f);
 
@@ -39,8 +39,8 @@ const float DEADBAND_COMPENSATION = 30.0f;
 float dt = 0.0f;
 unsigned long last_loop_time = 0;
 
-const float LQR_VELOCITY_MAX =  1.25f;
-const float LQR_VELOCITY_MIN = -1.25f;
+const float LQR_VELOCITY_MAX =  1.5f;
+const float LQR_VELOCITY_MIN = -1.5f;
 
 static float v_target = 0.0f;
 static float u_prev   = 0.0f;
@@ -53,7 +53,7 @@ float x_final = 0.0f;
 float x_target = 0.0f;
 
 // Sprint trajectory parameters (1 m move; sign = direction)
-const float SPRINT_DISTANCE_M = 2.06f;
+const float SPRINT_DISTANCE_M = 2.0f * 1.04f;
 const float SPRINT_A_MAX      = 0.09f;   // [m/s^2] conservative acceleration
 const float SPRINT_V_MAX      = 2.5f;  // [m/s]   conservative cruise speed
 

@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 def _default_csv_path() -> str:
     # Default to the recording that the user referenced.
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "recordings", "eval_c_lqr.csv")
+    return os.path.join(script_dir, "recordings", "eval_c_pole.csv")
 
 
 def load_csv(csv_path: str) -> Tuple[List[float], List[float], List[float], List[float]]:
@@ -49,7 +49,7 @@ def load_csv(csv_path: str) -> Tuple[List[float], List[float], List[float], List
             t_list.append(t)
             angle_list.append(ang)
             velocity_list.append(vel)
-            position_list.append(pos)
+            position_list.append(1.03 * pos)
 
     if not t_list:
         raise ValueError("No valid rows parsed from CSV.")
